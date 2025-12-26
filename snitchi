@@ -27,7 +27,9 @@ eval "$CMD" 2>/dev/null | sed 's/^  //' | fzf \
     --footer "$CMD" \
     --prompt '/ ' \
     --with-shell 'bash -c' \
+    --preview "$SCRIPT_DIR/snitchi-help" \
+    --preview-window 'up,60%,hidden,wrap' \
     --bind 'ctrl-k:execute-silent(kill -9 $(echo {2} | xargs))' \
     --bind 'ctrl-\:transform:snitchi-toggle' \
     --bind 'change:transform:snitchi-on-change' \
-    --bind 'ctrl-h:execute(tmux display-popup -E -w 70 -h 25 -T " snitchi help " "$SCRIPT_DIR/snitchi-help | less -R")'
+    --bind 'ctrl-h:toggle-preview'
