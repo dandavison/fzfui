@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+sed 's/^  //' |
+fzf \
+    --header-lines 4 \
+    --border none \
+    --delimiter '│' \
+    --no-separator \
+    --bind 'ctrl-k:execute-silent(kill -9 $(echo {2} | xargs))'
