@@ -237,6 +237,74 @@ class TestModeToggle:
             )
             subprocess.run(tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5)
 
+    def test_toggle_does_not_show_raw_action_string(self):
+        """Regression test: toggle should not display raw fzf action strings.
+
+        Bug: If fzf action syntax is wrong (using : instead of () for non-final
+        actions in a chain), the raw action string appears in the query field
+        instead of being executed.
+        """
+        session_name = f"test-no-raw-action-{os.getpid()}"
+        socket = get_test_tmux_socket(session_name)
+        snitchi_path = SNITCHI_DIR / "snitchi"
+
+        try:
+            # Start snitchi
+            subprocess.run(
+                tmux_cmd(
+                    socket,
+                    "new-session",
+                    "-d",
+                    "-s",
+                    session_name,
+                    "-c",
+                    str(SNITCHI_DIR),
+                    str(snitchi_path),
+                ),
+                check=True,
+                timeout=5,
+            )
+            time.sleep(1.5)
+
+            # Press ctrl-\ to toggle mode
+            subprocess.run(
+                tmux_cmd(socket, "send-keys", "-t", session_name, "C-\\"),
+                check=True,
+            )
+            time.sleep(1.0)
+
+            # Capture output
+            result = subprocess.run(
+                tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            output = result.stdout
+
+            # Raw fzf action keywords should NOT appear in output
+            raw_action_keywords = [
+                "change-query",
+                "change-footer",
+                "change-prompt",
+                "disable-search",
+                "enable-search",
+            ]
+            for keyword in raw_action_keywords:
+                assert keyword not in output, (
+                    f"Raw fzf action '{keyword}' should not appear in output. "
+                    f"This indicates the transform action syntax is broken.\n"
+                    f"Output:\n{output}"
+                )
+
+        finally:
+            subprocess.run(
+                tmux_cmd(socket, "kill-session", "-t", session_name),
+                capture_output=True,
+                timeout=5,
+            )
+            subprocess.run(tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5)
+
 
 class TestQueryMode:
     """Tests for query (filter) mode behavior."""
