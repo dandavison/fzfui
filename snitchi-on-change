@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+state=$(<"$STATE_FILE")
+mode="${state%%|*}"
+
+if [[ "$mode" == "command" ]]; then
+    printf 'reload:eval %q 2>/dev/null | sed "s/^  //"' "$FZF_QUERY"
+fi
+# In query mode: output nothing, let fzf filter normally
+

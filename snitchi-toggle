@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+IFS='|' read -r mode query cmd < "$STATE_FILE"
+
+if [[ "$mode" == "query" ]]; then
+    # Switching to command mode: edit command, show query in footer
+    echo "command|$FZF_QUERY|$cmd" > "$STATE_FILE"
+    printf 'disable-search+change-query:%s+change-footer:%s+change-prompt:> ' "$cmd" "$FZF_QUERY"
+else
+    # Switching to query mode: edit query, show command in footer
+    new_cmd="$FZF_QUERY"
+    echo "query|$query|$new_cmd" > "$STATE_FILE"
+    printf 'enable-search+reload(eval %q 2>/dev/null | sed "s/^  //")+change-query:%s+change-footer:%s+change-prompt:/ ' "$new_cmd" "$query" "$new_cmd"
+fi
+
