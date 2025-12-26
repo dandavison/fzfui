@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT="$0"
 [[ -L "$SCRIPT" ]] && SCRIPT="$(readlink "$SCRIPT")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
+export SCRIPT_DIR
 export PATH="$SCRIPT_DIR:$PATH"
 
 STATE_FILE="/tmp/snitchi-$$.state"
@@ -28,4 +29,5 @@ eval "$CMD" 2>/dev/null | sed 's/^  //' | fzf \
     --with-shell 'bash -c' \
     --bind 'ctrl-k:execute-silent(kill -9 $(echo {2} | xargs))' \
     --bind 'ctrl-\:transform:snitchi-toggle' \
-    --bind 'change:transform:snitchi-on-change'
+    --bind 'change:transform:snitchi-on-change' \
+    --bind 'ctrl-h:execute(tmux display-popup -E -w 70 -h 25 -T " snitchi help " "$SCRIPT_DIR/snitchi-help | less -R")'

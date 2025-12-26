@@ -11,7 +11,6 @@ from typing import List
 
 import pytest
 
-
 TEST_INTERACTIVE = Path(__file__).parent / "test-interactive"
 SNITCHI_DIR = Path(__file__).parent.parent
 
@@ -58,6 +57,7 @@ def ensure_executable():
     (SNITCHI_DIR / "snitchi").chmod(0o755)
     (SNITCHI_DIR / "snitchi-toggle").chmod(0o755)
     (SNITCHI_DIR / "snitchi-on-change").chmod(0o755)
+    (SNITCHI_DIR / "snitchi-help").chmod(0o755)
 
 
 class TestBasicUI:
@@ -109,9 +109,9 @@ class TestModeToggle:
 
         # The prompt should contain '/' (without checking trailing space since
         # tmux capture may not preserve it exactly)
-        lines = output.split('\n')
+        lines = output.split("\n")
         # First non-empty line should be the prompt area
-        assert any('/' in line for line in lines[:3]), (
+        assert any("/" in line for line in lines[:3]), (
             f"Expected prompt '/' in first few lines, got:\n{output}"
         )
 
@@ -156,8 +156,8 @@ class TestModeToggle:
             output = result.stdout
 
             # Command mode uses '>' prompt (check first few lines)
-            lines = output.split('\n')
-            has_command_prompt = any('>' in line for line in lines[:3])
+            lines = output.split("\n")
+            has_command_prompt = any(">" in line for line in lines[:3])
             assert has_command_prompt, (
                 f"Expected command mode prompt '>' after ctrl-\\, got:\n{output}"
             )
@@ -174,7 +174,9 @@ class TestModeToggle:
                 capture_output=True,
                 timeout=5,
             )
-            subprocess.run(tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5)
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
+            )
 
     def test_toggle_back_to_query_mode(self):
         """Test: pressing ctrl-\\ twice returns to query mode."""
@@ -222,8 +224,10 @@ class TestModeToggle:
             output = result.stdout
 
             # Should be back in query mode with '/' prompt
-            lines = output.split('\n')
-            has_query_prompt = any('/' in line and '>' not in line for line in lines[:3])
+            lines = output.split("\n")
+            has_query_prompt = any(
+                "/" in line and ">" not in line for line in lines[:3]
+            )
             # Also verify footer shows command (indicator of query mode)
             assert "snitch ls" in output, (
                 f"Expected 'snitch ls' in footer after double toggle, got:\n{output}"
@@ -235,7 +239,9 @@ class TestModeToggle:
                 capture_output=True,
                 timeout=5,
             )
-            subprocess.run(tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5)
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
+            )
 
     def test_toggle_does_not_show_raw_action_string(self):
         """Regression test: toggle should not display raw fzf action strings.
@@ -303,7 +309,9 @@ class TestModeToggle:
                 capture_output=True,
                 timeout=5,
             )
-            subprocess.run(tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5)
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
+            )
 
 
 class TestQueryMode:
@@ -368,7 +376,9 @@ class TestQueryMode:
                 capture_output=True,
                 timeout=5,
             )
-            subprocess.run(tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5)
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
+            )
 
 
 class TestCommandMode:
@@ -437,7 +447,9 @@ class TestCommandMode:
                 capture_output=True,
                 timeout=5,
             )
-            subprocess.run(tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5)
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
+            )
 
 
 class TestScriptStructure:
@@ -456,11 +468,18 @@ class TestScriptStructure:
     def test_snitchi_on_change_exists(self):
         """Test: snitchi-on-change helper script exists."""
         on_change_path = SNITCHI_DIR / "snitchi-on-change"
-        assert on_change_path.exists(), f"snitchi-on-change not found at {on_change_path}"
+        assert on_change_path.exists(), (
+            f"snitchi-on-change not found at {on_change_path}"
+        )
+
+    def test_snitchi_help_exists(self):
+        """Test: snitchi-help helper script exists."""
+        help_path = SNITCHI_DIR / "snitchi-help"
+        assert help_path.exists(), f"snitchi-help not found at {help_path}"
 
     def test_scripts_have_shebang(self):
         """Test: all scripts have proper shebang."""
-        scripts = ["snitchi", "snitchi-toggle", "snitchi-on-change"]
+        scripts = ["snitchi", "snitchi-toggle", "snitchi-on-change", "snitchi-help"]
 
         for script_name in scripts:
             script_path = SNITCHI_DIR / script_name
@@ -472,7 +491,7 @@ class TestScriptStructure:
 
     def test_scripts_are_valid_bash(self):
         """Test: all scripts pass bash syntax check."""
-        scripts = ["snitchi", "snitchi-toggle", "snitchi-on-change"]
+        scripts = ["snitchi", "snitchi-toggle", "snitchi-on-change", "snitchi-help"]
 
         for script_name in scripts:
             script_path = SNITCHI_DIR / script_name
@@ -484,4 +503,3 @@ class TestScriptStructure:
             assert result.returncode == 0, (
                 f"{script_name} has bash syntax errors: {result.stderr}"
             )
-
