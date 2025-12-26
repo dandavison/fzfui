@@ -1,0 +1,19 @@
+[project]
+name = "snitchi"
+version = "0.1.0"
+description = "Interactive fzf UI for snitch network connection inspector"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v"

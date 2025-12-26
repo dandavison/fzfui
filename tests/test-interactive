@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# test-interactive - Test interactive CLI programs by capturing their tmux output
+#
+# Usage: test-interactive <command> [sleep_time]
+#   command: The command to run (will be executed with bash -c)
+#   sleep_time: How long to wait before capturing (default 0.5 seconds)
+#
+# Example:
+#   test-interactive "snitchi"
+#   test-interactive "snitchi -t" 1
+
+if [[ $# -eq 0 ]]; then
+    echo "Usage: $0 <command> [sleep_time]"
+    echo "Example: $0 'snitchi' 0.5"
+    exit 1
+fi
+
+COMMAND="$1"
+SLEEP_TIME="${2:-0.5}"
+
+# In CI environments, we might need extra time for processes to start
+if [ "$CI" = "true" ]; then
+    SLEEP_TIME=$(awk "BEGIN {print $SLEEP_TIME + 0.5}")
+fi
+
+SESSION_NAME="test-interactive-$$"
+# Use a separate tmux server socket for tests to avoid interfering with user's tmux
+TMUX_SOCKET="test-socket-$$"
+
+# Check if tmux is available
+if ! command -v tmux &>/dev/null; then
+    echo "Error: tmux is not installed" >&2
+    exit 1
+fi
+
+# Kill any existing test session with same name (cleanup from failed runs)
+tmux -L "$TMUX_SOCKET" kill-session -t "$SESSION_NAME" 2>/dev/null
+tmux -L "$TMUX_SOCKET" kill-server 2>/dev/null
+
+echo "=== Testing: $COMMAND ===" >&2
+echo "=== Waiting ${SLEEP_TIME}s for UI to render ===" >&2
+
+# Create a detached tmux session running the command
+tmux -L "$TMUX_SOCKET" new-session -d -s "$SESSION_NAME" -c "$(pwd)" bash -c "$COMMAND"
+
+# Wait for the UI to render
+sleep "$SLEEP_TIME"
+
+# Capture the pane content
+echo "=== Captured output ===" >&2
+tmux -L "$TMUX_SOCKET" capture-pane -t "$SESSION_NAME" -p
+
+# Kill the session and the test server
+tmux -L "$TMUX_SOCKET" kill-session -t "$SESSION_NAME" 2>/dev/null
+tmux -L "$TMUX_SOCKET" kill-server 2>/dev/null
+
+echo "=== Test complete ===" >&2
+

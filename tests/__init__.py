@@ -1,0 +1,2 @@
+# snitchi test suite
+
