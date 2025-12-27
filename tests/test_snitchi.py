@@ -55,9 +55,10 @@ def ensure_executable():
     """Ensure test-interactive and snitchi scripts are executable."""
     TEST_INTERACTIVE.chmod(0o755)
     (SNITCHI_DIR / "snitchi").chmod(0o755)
-    (SNITCHI_DIR / "snitchi-toggle").chmod(0o755)
-    (SNITCHI_DIR / "snitchi-on-change").chmod(0o755)
     (SNITCHI_DIR / "snitchi-help").chmod(0o755)
+    (SNITCHI_DIR / "cmdi").chmod(0o755)
+    (SNITCHI_DIR / "cmdi-toggle").chmod(0o755)
+    (SNITCHI_DIR / "cmdi-on-change").chmod(0o755)
 
 
 class TestBasicUI:
@@ -460,16 +461,21 @@ class TestScriptStructure:
         snitchi_path = SNITCHI_DIR / "snitchi"
         assert snitchi_path.exists(), f"snitchi script not found at {snitchi_path}"
 
-    def test_snitchi_toggle_exists(self):
-        """Test: snitchi-toggle helper script exists."""
-        toggle_path = SNITCHI_DIR / "snitchi-toggle"
-        assert toggle_path.exists(), f"snitchi-toggle not found at {toggle_path}"
+    def test_cmdi_exists(self):
+        """Test: cmdi framework script exists."""
+        cmdi_path = SNITCHI_DIR / "cmdi"
+        assert cmdi_path.exists(), f"cmdi not found at {cmdi_path}"
 
-    def test_snitchi_on_change_exists(self):
-        """Test: snitchi-on-change helper script exists."""
-        on_change_path = SNITCHI_DIR / "snitchi-on-change"
+    def test_cmdi_toggle_exists(self):
+        """Test: cmdi-toggle helper script exists."""
+        toggle_path = SNITCHI_DIR / "cmdi-toggle"
+        assert toggle_path.exists(), f"cmdi-toggle not found at {toggle_path}"
+
+    def test_cmdi_on_change_exists(self):
+        """Test: cmdi-on-change helper script exists."""
+        on_change_path = SNITCHI_DIR / "cmdi-on-change"
         assert on_change_path.exists(), (
-            f"snitchi-on-change not found at {on_change_path}"
+            f"cmdi-on-change not found at {on_change_path}"
         )
 
     def test_snitchi_help_exists(self):
@@ -477,9 +483,14 @@ class TestScriptStructure:
         help_path = SNITCHI_DIR / "snitchi-help"
         assert help_path.exists(), f"snitchi-help not found at {help_path}"
 
+    def test_snitch_conf_exists(self):
+        """Test: snitch.conf config file exists."""
+        conf_path = SNITCHI_DIR / "snitch.conf"
+        assert conf_path.exists(), f"snitch.conf not found at {conf_path}"
+
     def test_scripts_have_shebang(self):
         """Test: all scripts have proper shebang."""
-        scripts = ["snitchi", "snitchi-toggle", "snitchi-on-change", "snitchi-help"]
+        scripts = ["snitchi", "snitchi-help", "cmdi", "cmdi-toggle", "cmdi-on-change"]
 
         for script_name in scripts:
             script_path = SNITCHI_DIR / script_name
@@ -491,7 +502,7 @@ class TestScriptStructure:
 
     def test_scripts_are_valid_bash(self):
         """Test: all scripts pass bash syntax check."""
-        scripts = ["snitchi", "snitchi-toggle", "snitchi-on-change", "snitchi-help"]
+        scripts = ["snitchi", "snitchi-help", "cmdi", "cmdi-toggle", "cmdi-on-change"]
 
         for script_name in scripts:
             script_path = SNITCHI_DIR / script_name

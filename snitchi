@@ -1,35 +1,9 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# snitchi - interactive snitch wrapper using cmdi
 
-# Resolve symlinks to find actual script directory (where helpers live)
 SCRIPT="$0"
 [[ -L "$SCRIPT" ]] && SCRIPT="$(readlink "$SCRIPT")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
-export SCRIPT_DIR
-export PATH="$SCRIPT_DIR:$PATH"
 
-STATE_FILE="/tmp/snitchi-$$.state"
-export STATE_FILE
-trap 'rm -f "$STATE_FILE"' EXIT
-
-# Build initial command
-CMD="snitch ls${*:+ $*}"
-
-# State format: mode|query|command
-echo "query||$CMD" > "$STATE_FILE"
-
-eval "$CMD" 2>/dev/null | sed 's/^  //' | fzf \
-    --ansi \
-    --header-lines 4 \
-    --border none \
-    --no-separator \
-    --delimiter '│' \
-    --footer "$CMD" \
-    --prompt '/ ' \
-    --with-shell 'bash -c' \
-    --preview "$SCRIPT_DIR/snitchi-help" \
-    --preview-window 'up,60%,hidden,wrap' \
-    --bind 'ctrl-k:execute-silent(kill -9 $(echo {2} | xargs))' \
-    --bind 'ctrl-\:transform:snitchi-toggle' \
-    --bind 'change:transform:snitchi-on-change' \
-    --bind 'ctrl-h:toggle-preview'
+# snitch output has leading spaces that need stripping
+exec "$SCRIPT_DIR/cmdi" "snitch ls${*:+ $*} | sed 's/^  //'" --config "$SCRIPT_DIR/snitch.conf"

@@ -3,10 +3,10 @@
 
 cat << 'EOF'
 ╭──────────────────────────────────────────────────────────────╮
-│                     snitchi keybindings                      │
+│                        Keybindings                           │
 ╰──────────────────────────────────────────────────────────────╯
 
-  ctrl-h      Show this help
+  ctrl-h      Toggle this help panel
   ctrl-\      Toggle between query/command mode
   ctrl-k      Kill selected process (SIGKILL)
   esc         Exit
