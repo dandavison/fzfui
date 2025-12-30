@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# socketsi - interactive osquery sockets viewer using cmdi
+
+SCRIPT="$0"
+[[ -L "$SCRIPT" ]] && SCRIPT="$(readlink "$SCRIPT")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
+
+# Default query for listening sockets
+QUERY="${1:-SELECT
+    s.pid,
+    s.local_port,
+    p.cmdline,
+    p.cwd
+  FROM process_open_sockets AS s
+  INNER JOIN processes AS p ON s.pid = p.pid
+  WHERE s.state = 'LISTEN'
+  ORDER BY p.cmdline}"
+
+exec "$SCRIPT_DIR/cmdi" \
+  "osqueryi --list --separator ',' \"$QUERY\" | column -t -s ',' | sed '1d'" \
+  --config "$SCRIPT_DIR/sockets.conf"
