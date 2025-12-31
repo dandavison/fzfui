@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
+from textwrap import dedent
 
 import fzfui
 
@@ -43,47 +43,47 @@ def detail(pid: str):
         input("Press any key...")
         return
 
-    os.system("clear")
-    print()
-    print("═" * 67)
-    print(f"  PROCESS DETAILS (PID: {pid})")
-    print("═" * 67)
-    print()
-
     parts = result.stdout.strip().split(None, 7)
-    if len(parts) >= 7:
-        labels = ["PID", "User", "CPU", "Memory", "State", "Started", "Time"]
-        for label, val in zip(labels, parts[:7]):
-            print(f"  {label:8} {val}")
-        if len(parts) > 7:
-            print()
-            print("  Command:")
-            print(f"    {parts[7][:70]}")
+    info = dict(zip(
+        ["pid", "user", "cpu", "mem", "stat", "start", "time", "cmd"],
+        parts + [""] * (8 - len(parts)),
+    ))
+    info["cmd"] = info["cmd"][:70]
 
-    print()
-    print("─" * 67)
-    print("  Open files/ports (first 20):")
-
-    lsof_result = subprocess.run(
-        ["lsof", "-p", pid],
-        capture_output=True,
-        text=True,
-    )
+    lsof_result = subprocess.run(["lsof", "-p", pid], capture_output=True, text=True)
     if lsof_result.returncode == 0:
         lines = lsof_result.stdout.strip().split("\n")[1:21]
-        if lines:
-            for line in lines:
-                parts = line.split()
-                if len(parts) >= 9:
-                    print(f"    {parts[4]:10} {parts[8]}")
-        else:
-            print("    (none)")
+        files = "\n".join(
+            f"    {p[4]:10} {p[8]}"
+            for line in lines
+            if len(p := line.split()) >= 9
+        ) or "    (none)"
     else:
-        print("    (permission denied)")
+        files = "    (permission denied)"
 
-    print()
-    print("═" * 67)
-    print()
+    os.system("clear")
+    print(dedent(f"""
+        ═══════════════════════════════════════════════════════════════════
+          PROCESS DETAILS (PID: {pid})
+        ═══════════════════════════════════════════════════════════════════
+
+          PID      {info['pid']}
+          User     {info['user']}
+          CPU      {info['cpu']}
+          Memory   {info['mem']}
+          State    {info['stat']}
+          Started  {info['start']}
+          Time     {info['time']}
+
+          Command:
+            {info['cmd']}
+
+        ───────────────────────────────────────────────────────────────────
+          Open files/ports (first 20):
+        {files}
+
+        ═══════════════════════════════════════════════════════════════════
+    """))
     input("Press any key...")
 
 
@@ -104,30 +104,30 @@ def reload(_: str):
 
 @app.preview
 def help_panel(_: str) -> str:
-    return """
-╭──────────────────────────────────────────────────────────────╮
-│                        Keybindings                           │
-╰──────────────────────────────────────────────────────────────╯
+    return dedent("""\
+        ╭──────────────────────────────────────────────────────────────╮
+        │                        Keybindings                           │
+        ╰──────────────────────────────────────────────────────────────╯
 
-  enter       Show process details
-  ctrl-k      Kill process (SIGKILL)
-  ctrl-r      Reload process list
-  ctrl-h      Toggle this help
-  ctrl-\\      Toggle query/command mode
-  esc         Exit
+          enter       Show process details
+          ctrl-k      Kill process (SIGKILL)
+          ctrl-r      Reload process list
+          ctrl-h      Toggle this help
+          ctrl-\\      Toggle query/command mode
+          esc         Exit
 
-╭──────────────────────────────────────────────────────────────╮
-│                         Columns                              │
-╰──────────────────────────────────────────────────────────────╯
+        ╭──────────────────────────────────────────────────────────────╮
+        │                         Columns                              │
+        ╰──────────────────────────────────────────────────────────────╯
 
-  %CPU    CPU usage percentage
-  %MEM    Memory usage percentage
-  STAT    Process state (S=sleeping, R=running, etc.)
-  TIME    Cumulative CPU time
-  COMMAND Process command (truncated)
+          %CPU    CPU usage percentage
+          %MEM    Memory usage percentage
+          STAT    Process state (S=sleeping, R=running, etc.)
+          TIME    Cumulative CPU time
+          COMMAND Process command (truncated)
 
-  PID is hidden but used for kill/details.
-"""
+          PID is hidden but used for kill/details.
+        """)
 
 
 if __name__ == "__main__":
