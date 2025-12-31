@@ -1,3 +1,7 @@
+[build-system]
+requires = ["uv_build>=0.5.15"]
+build-backend = "uv_build"
+
 [project]
 name = "snitchi"
 version = "0.1.0"
@@ -5,6 +9,18 @@ description = "Interactive fzf UI for snitch network connection inspector"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = []
+license = "MIT"
+authors = [{ name = "Dan Davison" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
 
 [dependency-groups]
 dev = [
