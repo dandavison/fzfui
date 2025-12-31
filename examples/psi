@@ -55,12 +55,14 @@ def detail(pid: str):
         lines = lsof_result.stdout.strip().split("\n")[1:21]
         files = (
             "\n".join(
-                f"    {p[4]:10} {p[8]}" for line in lines if len(p := line.split()) >= 9
+                f"        {p[4]:10} {p[8]}"
+                for line in lines
+                if len(p := line.split()) >= 9
             )
-            or "    (none)"
+            or "        (none)"
         )
     else:
-        files = "    (permission denied)"
+        files = "        (permission denied)"
 
     os.system("clear")
     print(
