@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-# snitchi - interactive snitch wrapper using cmdz
-
-SCRIPT="$0"
-[[ -L "$SCRIPT" ]] && SCRIPT="$(readlink "$SCRIPT")"
-SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
-
-# snitch output has leading spaces that need stripping
-exec "$SCRIPT_DIR/cmdz" "snitch ls${*:+ $*} | sed 's/^  //'" --config "$SCRIPT_DIR/snitch.conf"

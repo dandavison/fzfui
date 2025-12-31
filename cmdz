@@ -19,7 +19,6 @@ Modes:
 
 Example:
   cmdz "ps aux" --config ~/.config/cmdz/ps.conf
-  cmdz "snitch ls -t" -- --header-lines 4
 EOF
     exit 1
 }
