@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# socketsi - interactive osquery sockets viewer using cmdi
+# socketsi - interactive osquery sockets viewer using cmdz
 
 SCRIPT="$0"
 [[ -L "$SCRIPT" ]] && SCRIPT="$(readlink "$SCRIPT")"
@@ -16,6 +16,6 @@ QUERY="${1:-SELECT
   WHERE s.state = 'LISTEN'
   ORDER BY p.cmdline}"
 
-exec "$SCRIPT_DIR/cmdi" \
+exec "$SCRIPT_DIR/cmdz" \
   "osqueryi --list --separator ',' \"$QUERY\" | column -t -s ',' | sed '1d'" \
   --config "$SCRIPT_DIR/sockets.conf"

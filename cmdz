@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# cmdi - command-mode fzf wrapper
+# cmdz - command-mode fzf wrapper
 # Provides two modes: query mode (filter output) and command mode (edit command)
 
 usage() {
     cat <<EOF
-Usage: cmdi <command> [--config <file>] [-- extra fzf args...]
+Usage: cmdz <command> [--config <file>] [-- extra fzf args...]
 
 Arguments:
   <command>     The command to run (quoted if contains spaces)
@@ -18,8 +18,8 @@ Modes:
   Command mode (ctrl-\\): Edit command live, query shown in footer
 
 Example:
-  cmdi "ps aux" --config ~/.config/cmdi/ps.conf
-  cmdi "snitch ls -t" -- --header-lines 4
+  cmdz "ps aux" --config ~/.config/cmdz/ps.conf
+  cmdz "snitch ls -t" -- --header-lines 4
 EOF
     exit 1
 }
@@ -69,7 +69,7 @@ if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
 fi
 
 # State management
-STATE_FILE="/tmp/cmdi-$$.state"
+STATE_FILE="/tmp/cmdz-$$.state"
 export STATE_FILE
 trap 'rm -f "$STATE_FILE"' EXIT
 
@@ -84,8 +84,8 @@ eval "$CMD" 2>/dev/null | fzf \
     --footer "$CMD" \
     --prompt '/ ' \
     --with-shell 'bash -c' \
-    --bind 'ctrl-\:transform:cmdi-toggle' \
-    --bind 'change:transform:cmdi-on-change' \
+    --bind 'ctrl-\:transform:cmdz-toggle' \
+    --bind 'change:transform:cmdz-on-change' \
     "${CONFIG_ARGS[@]}" \
     "${EXTRA_ARGS[@]}"
 

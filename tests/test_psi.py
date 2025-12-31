@@ -54,9 +54,9 @@ def ensure_executable():
     """Ensure test-interactive and psi scripts are executable."""
     TEST_INTERACTIVE.chmod(0o755)
     (CMDI_DIR / "psi").chmod(0o755)
-    (CMDI_DIR / "cmdi").chmod(0o755)
-    (CMDI_DIR / "cmdi-toggle").chmod(0o755)
-    (CMDI_DIR / "cmdi-on-change").chmod(0o755)
+    (CMDI_DIR / "cmdz").chmod(0o755)
+    (CMDI_DIR / "cmdz-toggle").chmod(0o755)
+    (CMDI_DIR / "cmdz-on-change").chmod(0o755)
 
 
 class TestBasicUI:

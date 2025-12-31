@@ -56,9 +56,9 @@ def ensure_executable():
     TEST_INTERACTIVE.chmod(0o755)
     (SNITCHI_DIR / "snitchi").chmod(0o755)
     (SNITCHI_DIR / "snitchi-help").chmod(0o755)
-    (SNITCHI_DIR / "cmdi").chmod(0o755)
-    (SNITCHI_DIR / "cmdi-toggle").chmod(0o755)
-    (SNITCHI_DIR / "cmdi-on-change").chmod(0o755)
+    (SNITCHI_DIR / "cmdz").chmod(0o755)
+    (SNITCHI_DIR / "cmdz-toggle").chmod(0o755)
+    (SNITCHI_DIR / "cmdz-on-change").chmod(0o755)
 
 
 class TestBasicUI:
@@ -461,21 +461,21 @@ class TestScriptStructure:
         snitchi_path = SNITCHI_DIR / "snitchi"
         assert snitchi_path.exists(), f"snitchi script not found at {snitchi_path}"
 
-    def test_cmdi_exists(self):
-        """Test: cmdi framework script exists."""
-        cmdi_path = SNITCHI_DIR / "cmdi"
-        assert cmdi_path.exists(), f"cmdi not found at {cmdi_path}"
+    def test_cmdz_exists(self):
+        """Test: cmdz framework script exists."""
+        cmdz_path = SNITCHI_DIR / "cmdz"
+        assert cmdz_path.exists(), f"cmdz not found at {cmdz_path}"
 
-    def test_cmdi_toggle_exists(self):
-        """Test: cmdi-toggle helper script exists."""
-        toggle_path = SNITCHI_DIR / "cmdi-toggle"
-        assert toggle_path.exists(), f"cmdi-toggle not found at {toggle_path}"
+    def test_cmdz_toggle_exists(self):
+        """Test: cmdz-toggle helper script exists."""
+        toggle_path = SNITCHI_DIR / "cmdz-toggle"
+        assert toggle_path.exists(), f"cmdz-toggle not found at {toggle_path}"
 
-    def test_cmdi_on_change_exists(self):
-        """Test: cmdi-on-change helper script exists."""
-        on_change_path = SNITCHI_DIR / "cmdi-on-change"
+    def test_cmdz_on_change_exists(self):
+        """Test: cmdz-on-change helper script exists."""
+        on_change_path = SNITCHI_DIR / "cmdz-on-change"
         assert on_change_path.exists(), (
-            f"cmdi-on-change not found at {on_change_path}"
+            f"cmdz-on-change not found at {on_change_path}"
         )
 
     def test_snitchi_help_exists(self):
@@ -490,7 +490,7 @@ class TestScriptStructure:
 
     def test_scripts_have_shebang(self):
         """Test: all scripts have proper shebang."""
-        scripts = ["snitchi", "snitchi-help", "cmdi", "cmdi-toggle", "cmdi-on-change"]
+        scripts = ["snitchi", "snitchi-help", "cmdz", "cmdz-toggle", "cmdz-on-change"]
 
         for script_name in scripts:
             script_path = SNITCHI_DIR / script_name
@@ -502,7 +502,7 @@ class TestScriptStructure:
 
     def test_scripts_are_valid_bash(self):
         """Test: all scripts pass bash syntax check."""
-        scripts = ["snitchi", "snitchi-help", "cmdi", "cmdi-toggle", "cmdi-on-change"]
+        scripts = ["snitchi", "snitchi-help", "cmdz", "cmdz-toggle", "cmdz-on-change"]
 
         for script_name in scripts:
             script_path = SNITCHI_DIR / script_name
