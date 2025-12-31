@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["fzfui", "rich"]
+# dependencies = ["fzfui"]
 # [tool.uv.sources]
 # fzfui = { path = "/Users/dan/src/fzfui", editable = true }
 # ///
@@ -10,16 +10,11 @@ from __future__ import annotations
 
 import os
 import subprocess
+from textwrap import dedent
 
 import fzfui
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
-from rich import box
 
 app = fzfui.App(__file__)
-console = Console()
 
 
 @app.main(
@@ -44,58 +39,52 @@ def detail(pid: str):
     )
 
     if result.returncode != 0:
-        console.print(Panel(
-            f"[bold red]Process {pid} not found[/]",
-            border_style="red",
-        ))
-        input()
+        print(f"Process {pid} not found")
+        input("Press any key...")
         return
 
     parts = result.stdout.strip().split(None, 7)
-    fields = ["PID", "User", "CPU", "Memory", "State", "Started", "Time", "Command"]
-    info = dict(zip(fields, parts + [""] * (8 - len(parts))))
+    info = dict(zip(
+        ["pid", "user", "cpu", "mem", "stat", "start", "time", "cmd"],
+        parts + [""] * (8 - len(parts)),
+    ))
+    info["cmd"] = info["cmd"][:70]
 
-    # Process details table
-    details = Table(box=None, show_header=False, padding=(0, 2))
-    details.add_column("label", style="dim")
-    details.add_column("value", style="bold")
-    for key in ["PID", "User", "CPU", "Memory", "State", "Started", "Time"]:
-        details.add_row(key, info[key])
-
-    # Open files from lsof
-    lsof = subprocess.run(["lsof", "-p", pid], capture_output=True, text=True)
-    if lsof.returncode == 0:
-        lines = lsof.stdout.strip().split("\n")[1:21]
-        files_table = Table(box=None, show_header=False, padding=(0, 1))
-        files_table.add_column("type", style="cyan", width=12)
-        files_table.add_column("path", style="dim")
-        for line in lines:
-            parts = line.split()
-            if len(parts) >= 9:
-                files_table.add_row(parts[4], parts[8])
-        files_content = files_table if lines else Text("(none)", style="dim italic")
+    lsof_result = subprocess.run(["lsof", "-p", pid], capture_output=True, text=True)
+    if lsof_result.returncode == 0:
+        lines = lsof_result.stdout.strip().split("\n")[1:21]
+        files = "\n".join(
+            f"    {p[4]:10} {p[8]}"
+            for line in lines
+            if len(p := line.split()) >= 9
+        ) or "    (none)"
     else:
-        files_content = Text("(permission denied)", style="dim italic")
+        files = "    (permission denied)"
 
-    # Build output
     os.system("clear")
-    console.print()
-    console.print(Panel(
-        details,
-        title=f"[bold]Process {pid}[/]",
-        subtitle=f"[dim]{info['Command'][:60]}[/]",
-        border_style="blue",
-        box=box.ROUNDED,
-    ))
-    console.print()
-    console.print(Panel(
-        files_content,
-        title="[bold]Open Files[/] [dim](first 20)[/]",
-        border_style="dim",
-        box=box.ROUNDED,
-    ))
-    console.print()
-    console.input("[dim]Press enter to continue...[/]")
+    print(dedent(f"""
+        ═══════════════════════════════════════════════════════════════════
+          PROCESS DETAILS (PID: {pid})
+        ═══════════════════════════════════════════════════════════════════
+
+          PID      {info['pid']}
+          User     {info['user']}
+          CPU      {info['cpu']}
+          Memory   {info['mem']}
+          State    {info['stat']}
+          Started  {info['start']}
+          Time     {info['time']}
+
+          Command:
+            {info['cmd']}
+
+        ───────────────────────────────────────────────────────────────────
+          Open files/ports (first 20):
+        {files}
+
+        ═══════════════════════════════════════════════════════════════════
+    """))
+    input("Press any key...")
 
 
 @app.action("ctrl-k", reload=True, silent=True, field=1)
@@ -115,37 +104,32 @@ def reload(_: str):
 
 @app.preview
 def help_panel(_: str) -> str:
-    console = Console(force_terminal=True, width=60)
+    return dedent("""\
+        ╭──────────────────────────────────────────────────────────────╮
+        │                        Keybindings                           │
+        ╰──────────────────────────────────────────────────────────────╯
 
-    keys = Table(box=None, show_header=False, padding=(0, 2))
-    keys.add_column("key", style="bold cyan")
-    keys.add_column("action", style="white")
-    keys.add_row("enter", "Show process details")
-    keys.add_row("ctrl-k", "Kill process (SIGKILL)")
-    keys.add_row("ctrl-r", "Reload process list")
-    keys.add_row("ctrl-h", "Toggle this help")
-    keys.add_row("ctrl-\\", "Toggle query/command mode")
-    keys.add_row("esc", "Exit")
+          enter       Show process details
+          ctrl-k      Kill process (SIGKILL)
+          ctrl-r      Reload process list
+          ctrl-h      Toggle this help
+          ctrl-\\      Toggle query/command mode
+          esc         Exit
 
-    cols = Table(box=None, show_header=False, padding=(0, 2))
-    cols.add_column("col", style="bold yellow")
-    cols.add_column("desc", style="dim")
-    cols.add_row("%CPU", "CPU usage percentage")
-    cols.add_row("%MEM", "Memory usage percentage")
-    cols.add_row("STAT", "Process state (S=sleeping, R=running)")
-    cols.add_row("TIME", "Cumulative CPU time")
-    cols.add_row("CMD", "Process command (truncated)")
+        ╭──────────────────────────────────────────────────────────────╮
+        │                         Columns                              │
+        ╰──────────────────────────────────────────────────────────────╯
 
-    with console.capture() as capture:
-        console.print()
-        console.print(Panel(keys, title="[bold]Keybindings[/]", border_style="cyan", box=box.ROUNDED))
-        console.print()
-        console.print(Panel(cols, title="[bold]Columns[/]", border_style="yellow", box=box.ROUNDED))
-        console.print()
-        console.print("[dim italic]  PID is hidden but used for kill/details.[/]")
+          %CPU    CPU usage percentage
+          %MEM    Memory usage percentage
+          STAT    Process state (S=sleeping, R=running, etc.)
+          TIME    Cumulative CPU time
+          COMMAND Process command (truncated)
 
-    return capture.get()
+          PID is hidden but used for kill/details.
+        """)
 
 
 if __name__ == "__main__":
     app()
+
