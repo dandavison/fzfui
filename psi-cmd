@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# psi-cmd - The ps command for psi
+# Outputs truncated process list for current user
+
+ps -U "$USER" -o pid,%cpu,%mem,stat,time,command | cut -c1-200
+

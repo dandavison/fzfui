@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# psi - interactive process viewer using cmdi
+
+SCRIPT="$0"
+[[ -L "$SCRIPT" ]] && SCRIPT="$(readlink "$SCRIPT")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
+
+exec "$SCRIPT_DIR/cmdi" "psi-cmd${*:+ $*}" --config "$SCRIPT_DIR/psi.conf"
+
+

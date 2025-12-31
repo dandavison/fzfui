@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# psi-help - Display help for psi keybindings
+
+cat << 'EOF'
+╭──────────────────────────────────────────────────────────────╮
+│                        Keybindings                           │
+╰──────────────────────────────────────────────────────────────╯
+
+  enter       Show process details
+  ctrl-k      Kill process (SIGKILL)
+  ctrl-r      Reload process list
+  ctrl-h      Toggle this help
+  ctrl-\      Toggle query/command mode
+  esc         Exit
+
+╭──────────────────────────────────────────────────────────────╮
+│                         Columns                              │
+╰──────────────────────────────────────────────────────────────╯
+
+  %CPU    CPU usage percentage
+  %MEM    Memory usage percentage
+  STAT    Process state (S=sleeping, R=running, etc.)
+  TIME    Cumulative CPU time
+  COMMAND Process command (truncated)
+
+  PID is hidden but used for kill/details.
+
+EOF
+
