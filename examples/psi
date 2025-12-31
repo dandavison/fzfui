@@ -2,8 +2,6 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = ["fzfui"]
-# [tool.uv.sources]
-# fzfui = { path = "/Users/dan/src/fzfui", editable = true }
 # ///
 
 from __future__ import annotations
@@ -44,46 +42,51 @@ def detail(pid: str):
         return
 
     parts = result.stdout.strip().split(None, 7)
-    info = dict(zip(
-        ["pid", "user", "cpu", "mem", "stat", "start", "time", "cmd"],
-        parts + [""] * (8 - len(parts)),
-    ))
+    info = dict(
+        zip(
+            ["pid", "user", "cpu", "mem", "stat", "start", "time", "cmd"],
+            parts + [""] * (8 - len(parts)),
+        )
+    )
     info["cmd"] = info["cmd"][:70]
 
     lsof_result = subprocess.run(["lsof", "-p", pid], capture_output=True, text=True)
     if lsof_result.returncode == 0:
         lines = lsof_result.stdout.strip().split("\n")[1:21]
-        files = "\n".join(
-            f"    {p[4]:10} {p[8]}"
-            for line in lines
-            if len(p := line.split()) >= 9
-        ) or "    (none)"
+        files = (
+            "\n".join(
+                f"    {p[4]:10} {p[8]}" for line in lines if len(p := line.split()) >= 9
+            )
+            or "    (none)"
+        )
     else:
         files = "    (permission denied)"
 
     os.system("clear")
-    print(dedent(f"""
+    print(
+        dedent(f"""
         ═══════════════════════════════════════════════════════════════════
           PROCESS DETAILS (PID: {pid})
         ═══════════════════════════════════════════════════════════════════
 
-          PID      {info['pid']}
-          User     {info['user']}
-          CPU      {info['cpu']}
-          Memory   {info['mem']}
-          State    {info['stat']}
-          Started  {info['start']}
-          Time     {info['time']}
+          PID      {info["pid"]}
+          User     {info["user"]}
+          CPU      {info["cpu"]}
+          Memory   {info["mem"]}
+          State    {info["stat"]}
+          Started  {info["start"]}
+          Time     {info["time"]}
 
           Command:
-            {info['cmd']}
+            {info["cmd"]}
 
         ───────────────────────────────────────────────────────────────────
           Open files/ports (first 20):
         {files}
 
         ═══════════════════════════════════════════════════════════════════
-    """))
+    """)
+    )
     input("Press any key...")
 
 
@@ -132,4 +135,3 @@ def help_panel(_: str) -> str:
 
 if __name__ == "__main__":
     app()
-
