@@ -93,9 +93,22 @@ def preview(query: str) -> str:
         return "jq not found. Install with: brew install jq"
 
 
+def save_history(query: str):
+    """Append query to history if it's not the same as the last entry."""
+    try:
+        last = HISTORY_FILE.read_text().splitlines()[-1] if HISTORY_FILE.exists() else ""
+    except (IndexError, OSError):
+        last = ""
+    if query and query != last:
+        with open(HISTORY_FILE, "a") as f:
+            f.write(query + "\n")
+
+
 @app.action("enter", exit=True)
 def output_result(query: str):
     """Output the jq result and exit."""
+    save_history(query)
+
     file = app.arg("file")
     if not file:
         return
