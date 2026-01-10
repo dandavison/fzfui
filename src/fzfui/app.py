@@ -109,6 +109,7 @@ class App:
         initial_query: str = "",
         preview_window: Optional[str] = None,
         bindings: Optional[dict[str, str]] = None,
+        fzf_options: Optional[list[str]] = None,
     ):
         """
         Decorator to configure the main fzf interface.
@@ -122,6 +123,7 @@ class App:
             initial_query: Starting query string
             preview_window: Preview window config (e.g., "up,80%,wrap")
             bindings: Extra fzf key bindings (e.g., {"ctrl-k": "kill-line"})
+            fzf_options: Raw fzf CLI options (e.g., ["--height", "100%"])
         """
         def decorator(fn):
             self._command = command
@@ -133,6 +135,7 @@ class App:
                 "initial_query": initial_query,
                 "preview_window": preview_window,
                 "bindings": bindings or {},
+                "fzf_options": fzf_options or [],
             }
             self._main_fn = fn
 
@@ -211,6 +214,9 @@ class App:
         for key, fzf_action in self._config.get("bindings", {}).items():
             args.extend(["--bind", f"{key}:{fzf_action}"])
 
+        # Raw fzf options
+        args.extend(self._config.get("fzf_options", []))
+
         # Feed empty input - we don't need items in preview mode
         fzf_proc = subprocess.Popen(
             args,
@@ -278,6 +284,9 @@ class App:
             # Custom bindings
             for key, fzf_action in self._config.get("bindings", {}).items():
                 args.extend(["--bind", f"{key}:{fzf_action}"])
+
+            # Raw fzf options
+            args.extend(self._config.get("fzf_options", []))
 
             cmd_proc = subprocess.Popen(
                 self._command,
