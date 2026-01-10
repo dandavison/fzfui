@@ -134,6 +134,7 @@ def print_command(query: str):
 
 if __name__ == "__main__":
     if sys.stdin.isatty() and not os.environ.get("FZFUI_ARG_file"):
-        print(__doc__.strip(), file=sys.stderr)
+        if __doc__:
+            print(__doc__.strip(), file=sys.stderr)
         sys.exit(1)
     app()
