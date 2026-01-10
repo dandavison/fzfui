@@ -126,6 +126,7 @@ class App:
             bindings: Extra fzf key bindings (e.g., {"ctrl-k": "kill-line"})
             fzf_options: Raw fzf CLI options (e.g., ["--height", "100%"])
         """
+
         def decorator(fn):
             self._command = command
             self._reload_command = reload_command or command
@@ -153,7 +154,15 @@ class App:
         """Get a CLI argument value (set via FZFUI_ARG_<name> env var)."""
         return os.environ.get(f"FZFUI_ARG_{name}", default or "")
 
-    def action(self, key: str, *, reload: bool = False, silent: bool = False, field: int = 0, exit: bool = False):
+    def action(
+        self,
+        key: str,
+        *,
+        reload: bool = False,
+        silent: bool = False,
+        field: int = 0,
+        exit: bool = False,
+    ):
         def decorator(fn):
             self._actions[fn.__name__] = Action(
                 fn=fn, key=key, reload=reload, silent=silent, field=field, exit=exit
@@ -190,9 +199,14 @@ class App:
             "fzf",
             "--ansi",
             "--disabled",
-            "--layout", "reverse",
-            "--prompt", "> ",
-            "--with-shell", "bash -c",
+            "--layout",
+            "reverse",
+            "--border",
+            "none",
+            "--prompt",
+            "> ",
+            "--with-shell",
+            "bash -c",
         ]
 
         if initial_query:
@@ -200,10 +214,14 @@ class App:
 
         # Query-based preview
         if self._query_preview_fn:
-            args.extend([
-                "--preview", f"{script} _query-preview {{q}}",
-                "--preview-window", preview_window,
-            ])
+            args.extend(
+                [
+                    "--preview",
+                    f"{script} _query-preview {{q}}",
+                    "--preview-window",
+                    preview_window,
+                ]
+            )
 
         # Actions
         for name, action in self._actions.items():
@@ -312,4 +330,3 @@ class App:
 
     def __call__(self):
         self.cli()
-
