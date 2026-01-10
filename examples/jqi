@@ -17,10 +17,11 @@ Start with "." (identity) to see the full JSON.
 
 Keys:
     enter       Output jq result and exit
+    ctrl-c      Print jq command (to stderr) and exit
     alt-up/down Navigate history
     ctrl-k      Kill to end of line
     ctrl-y      Yank (paste)
-    esc/ctrl-c  Exit without output
+    esc         Exit without output
 """
 
 from __future__ import annotations
@@ -96,7 +97,9 @@ def preview(query: str) -> str:
 def save_history(query: str):
     """Append query to history if it's not the same as the last entry."""
     try:
-        last = HISTORY_FILE.read_text().splitlines()[-1] if HISTORY_FILE.exists() else ""
+        last = (
+            HISTORY_FILE.read_text().splitlines()[-1] if HISTORY_FILE.exists() else ""
+        )
     except (IndexError, OSError):
         last = ""
     if query and query != last:
@@ -120,6 +123,13 @@ def output_result(query: str):
     )
     if result.returncode == 0:
         print(result.stdout, end="")
+
+
+@app.action("ctrl-c", exit=True)
+def print_command(query: str):
+    """Print the jq command and exit."""
+    save_history(query)
+    print(f"jq '{query}'", file=sys.stderr)
 
 
 if __name__ == "__main__":
