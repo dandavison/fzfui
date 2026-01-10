@@ -46,7 +46,7 @@ app = fzfui.App(__file__)
         "ctrl-p": "up",
         "ctrl-n": "down",
     },
-    fzf_options=["--height", "100%", "--pointer", "", "--no-info"],
+    fzf_options=["--height", "100%", "--pointer", "", "--no-info", "--no-separator"],
 )
 def jqi():
     pass
