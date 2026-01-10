@@ -40,7 +40,7 @@ app = fzfui.App(__file__)
 @app.main(
     disabled=True,
     initial_query=".",
-    preview_window="up,99%,wrap",
+    preview_window="up,99%,wrap,noinfo",
     bindings={
         "ctrl-k": "kill-line",
         "ctrl-p": "up",
