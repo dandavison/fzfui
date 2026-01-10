@@ -97,7 +97,25 @@ class App:
     def _handle_action(self, name: str, selection: str):
         if name in self._actions:
             action = self._actions[name]
-            action.fn(selection)
+            # For exit actions, capture output to file so main process can print it
+            # (fzf's execute runs in subprocess with stdout = tty, not original stdout)
+            output_file = os.environ.get("FZFUI_OUTPUT")
+            if action.exit and output_file:
+                import io
+                import sys
+
+                old_stdout = sys.stdout
+                sys.stdout = io.StringIO()
+                try:
+                    action.fn(selection)
+                    output = sys.stdout.getvalue()
+                finally:
+                    sys.stdout = old_stdout
+                # Write captured output to file
+                with open(output_file, "w") as f:
+                    f.write(output)
+            else:
+                action.fn(selection)
 
     def main(
         self,
@@ -197,58 +215,81 @@ class App:
             self._config.get("preview_window") or "up,99%,wrap,noinfo,border-none"
         )
 
-        args = [
-            "fzf",
-            "--ansi",
-            "--disabled",
-            "--height",
-            "100%",
-            "--layout",
-            "reverse",
-            "--border",
-            "none",
-            "--input-border",
-            "--prompt",
-            "> ",
-            "--no-info",
-            "--no-separator",
-            "--with-shell",
-            "bash -c",
-        ]
+        # Create temp file to capture exit action output
+        # (fzf's execute subprocess has stdout = tty, not shell's redirected stdout)
+        output_fd, output_file = tempfile.mkstemp(prefix="fzfui-out-")
+        os.close(output_fd)
 
-        if initial_query:
-            args.extend(["--query", initial_query])
+        try:
+            env = os.environ.copy()
+            env["FZFUI_OUTPUT"] = output_file
 
-        # Query-based preview
-        if self._query_preview_fn:
-            args.extend(
-                [
-                    "--preview",
-                    f"{script} _query-preview {{q}}",
-                    "--preview-window",
-                    preview_window,
-                ]
+            args = [
+                "fzf",
+                "--ansi",
+                "--disabled",
+                "--height",
+                "100%",
+                "--layout",
+                "reverse",
+                "--border",
+                "none",
+                "--input-border",
+                "--prompt",
+                "> ",
+                "--no-info",
+                "--no-separator",
+                "--with-shell",
+                "bash -c",
+            ]
+
+            if initial_query:
+                args.extend(["--query", initial_query])
+
+            # Query-based preview
+            if self._query_preview_fn:
+                args.extend(
+                    [
+                        "--preview",
+                        f"{script} _query-preview {{q}}",
+                        "--preview-window",
+                        preview_window,
+                    ]
+                )
+
+            # Actions
+            for name, action in self._actions.items():
+                execute = "execute-silent" if action.silent else "execute"
+                binding = f"{execute}({script} _action {name} {{q}})"
+                if action.exit:
+                    binding += "+abort"
+                args.extend(["--bind", f"{action.key}:{binding}"])
+
+            # Custom bindings (e.g., emacs keys)
+            for key, fzf_action in self._config.get("bindings", {}).items():
+                args.extend(["--bind", f"{key}:{fzf_action}"])
+
+            # Raw fzf options
+            args.extend(self._config.get("fzf_options", []))
+
+            # Feed no input - we don't need items in preview mode
+            # Using `: |` pattern to send nothing (avoids vestigial selection UI)
+            fzf_cmd_str = " ".join(shlex.quote(arg) for arg in args)
+            # Pass env with FZFUI_OUTPUT to child processes
+            subprocess.call(
+                f": | FZFUI_OUTPUT={shlex.quote(output_file)} {fzf_cmd_str}",
+                shell=True,
+                executable="/bin/bash",
             )
 
-        # Actions
-        for name, action in self._actions.items():
-            execute = "execute-silent" if action.silent else "execute"
-            binding = f"{execute}({script} _action {name} {{q}})"
-            if action.exit:
-                binding += "+abort"
-            args.extend(["--bind", f"{action.key}:{binding}"])
+            # Print captured output from exit action (if any)
+            with open(output_file) as f:
+                output = f.read()
+            if output:
+                print(output, end="")
 
-        # Custom bindings (e.g., emacs keys)
-        for key, fzf_action in self._config.get("bindings", {}).items():
-            args.extend(["--bind", f"{key}:{fzf_action}"])
-
-        # Raw fzf options
-        args.extend(self._config.get("fzf_options", []))
-
-        # Feed no input - we don't need items in preview mode
-        # Using `: |` pattern to send nothing (avoids vestigial selection UI)
-        fzf_cmd_str = " ".join(shlex.quote(arg) for arg in args)
-        subprocess.call(f": | {fzf_cmd_str}", shell=True, executable="/bin/bash")
+        finally:
+            os.unlink(output_file)
 
     def _run_fzf_filter_mode(self):
         """Run fzf in filter mode (classic item selection)."""
