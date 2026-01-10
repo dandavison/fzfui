@@ -4,11 +4,29 @@
 
 fzfui is a Python library for building interactive fzf-based terminal UIs. It wraps fzf with a decorator-based Python API, allowing single-file scripts that define commands, actions, and previews declaratively.
 
+## Two Modes of Operation
+
+fzfui supports two distinct paradigms:
+
+### Filter Mode (default)
+Classic fzf usage: command → items → filter(query) → select → action
+
+```
+psi: ps aux → process list → filter by query → select → kill/view
+```
+
+### Preview Mode (`disabled=True`)
+Query is the input, not a filter. Preview shows query results in real-time.
+
+```
+jqi: type jq expression → preview shows jq output → copy result
+```
+
 ## Core Problem
 
 fzf is powerful but requires shell scripting for complex interactions. fzfui solves this by:
 
-1. Providing a Python API with decorators (`@app.main`, `@app.action`, `@app.preview`)
+1. Providing a Python API with decorators (`@app.main`, `@app.action`, `@app.preview`, `@app.query_preview`)
 2. Handling the callback mechanism so fzf can invoke Python functions
 3. Managing state for the dual-mode interface (query mode vs command mode)
 
@@ -45,20 +63,34 @@ app = fzfui.App(__file__)  # __file__ is critical for callbacks
 
 ### Decorators
 
-**`@app.main(command, header_lines, with_nth, reload_command)`**
+**`@app.main(command, header_lines, with_nth, reload_command, disabled, initial_query, preview_window)`**
 - Configures the initial command that generates fzf input
 - Sets up the typer callback with `invoke_without_command=True`
 - When invoked without subcommand, calls `_run_fzf()`
+- `disabled=True`: Preview mode - query is input, not filter
+- `initial_query`: Starting query string (useful with `disabled=True`)
+- `preview_window`: Preview window config (e.g., "up,80%,wrap")
 
 **`@app.action(key, reload, silent, field)`**
 - Registers a keybinding action
 - `reload`: Re-run the command after action
 - `silent`: Use `execute-silent` instead of `execute`
 - `field`: Which fzf field to pass (e.g., `{1}` for first column)
+- In preview mode, actions receive `{q}` (query) instead of selection
 
 **`@app.preview`**
-- Registers the preview panel content function
+- Registers the preview panel content function (filter mode)
 - Called via `--preview './script _preview {}'`
+- Receives the selected item
+
+**`@app.query_preview`**
+- Registers query-based preview function (preview mode)
+- Called via `--preview './script _query-preview {q}'`
+- Receives the query string
+
+**`app.arg(name)`**
+- Get CLI argument value from environment (`FZFUI_ARG_<name>`)
+- Used to pass arguments to callback functions
 
 ### Hidden Typer Subcommands
 
@@ -66,10 +98,11 @@ Registered in `_register_internal_commands()`:
 
 | Command | Purpose |
 |---------|---------|
-| `_toggle` | Switch between query/command mode |
+| `_toggle` | Switch between query/command mode (filter mode only) |
 | `_on-change` | Handle typing in command mode (live reload) |
-| `_action <name> <selection>` | Dispatch to registered action handler |
-| `_preview <selection>` | Render preview content |
+| `_action <name> <arg>` | Dispatch to registered action handler |
+| `_preview <selection>` | Render preview content (filter mode) |
+| `_query-preview <query>` | Render query-based preview (preview mode) |
 | `_reload` | Re-run the data command |
 
 These are registered with `hidden=True` so they don't appear in `--help` but are still callable.
@@ -126,7 +159,8 @@ src/fzfui/
 └── app.py           # App class, all logic
 
 examples/
-└── psi              # Single-file uv script example
+├── psi              # Filter mode example (process viewer)
+└── jqi              # Preview mode example (jq explorer)
 
 tests/
 ├── conftest.py      # Fixtures, dependency checks
@@ -134,7 +168,7 @@ tests/
 └── test-interactive # Bash helper for tmux-based testing
 ```
 
-## Example Script Anatomy
+## Example: Filter Mode (psi)
 
 ```python
 #!/usr/bin/env -S uv run --script
@@ -147,8 +181,8 @@ import fzfui
 
 app = fzfui.App(__file__)  # Script path for callbacks
 
-@app.main(command="...", header_lines=1)
-def myapp():
+@app.main(command="ps aux", header_lines=1)
+def psi():
     pass  # Body unused, just triggers setup
 
 @app.action("enter")
@@ -162,6 +196,41 @@ def show_preview(selection: str) -> str:
 
 if __name__ == "__main__":
     app()  # Runs typer CLI
+```
+
+## Example: Preview Mode (jqi)
+
+```python
+#!/usr/bin/env -S uv run --script
+import os, sys, subprocess
+import fzfui
+
+# Handle file argument before fzfui takes over
+if len(sys.argv) >= 2 and not sys.argv[1].startswith("_"):
+    os.environ["FZFUI_ARG_file"] = sys.argv[1]
+    sys.argv = [sys.argv[0]]
+
+app = fzfui.App(__file__)
+
+@app.main(disabled=True, initial_query=".", preview_window="up,90%,wrap")
+def jqi():
+    pass
+
+@app.query_preview
+def preview(query: str) -> str:
+    file = app.arg("file")
+    result = subprocess.run(["jq", "-C", query, file], capture_output=True, text=True)
+    return result.stdout if result.returncode == 0 else result.stderr
+
+@app.action("enter", silent=True)
+def copy_result(query: str):
+    # In preview mode, actions receive query, not selection
+    file = app.arg("file")
+    result = subprocess.run(["jq", query, file], capture_output=True, text=True)
+    subprocess.run(["pbcopy"], input=result.stdout, text=True)
+
+if __name__ == "__main__":
+    app()
 ```
 
 ## Testing Strategy

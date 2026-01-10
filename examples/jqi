@@ -1,0 +1,94 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["fzfui"]
+# [tool.uv.sources]
+# fzfui = { path = "/Users/dan/src/fzfui", editable = true }
+# ///
+
+"""
+jqi - Interactive jq expression explorer
+
+Usage: jqi <json-file>
+
+Type jq expressions in the query line and see results in real-time.
+Start with "." (identity) to see the full JSON.
+
+Keys:
+    enter     Copy result to clipboard (macOS)
+    ctrl-c    Exit
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from textwrap import dedent
+
+import fzfui
+
+# Handle file argument before fzfui takes over
+if len(sys.argv) >= 2 and not sys.argv[1].startswith("_"):
+    os.environ["FZFUI_ARG_file"] = sys.argv[1]
+    sys.argv = [sys.argv[0]]  # Remove arg so typer doesn't see it
+
+app = fzfui.App(__file__)
+
+
+@app.main(
+    disabled=True,
+    initial_query=".",
+    preview_window="up,90%,wrap",
+)
+def jqi():
+    pass
+
+
+@app.query_preview
+def preview(query: str) -> str:
+    file = app.arg("file")
+    if not file:
+        return "Usage: jqi <json-file>"
+
+    if not os.path.exists(file):
+        return f"File not found: {file}"
+
+    try:
+        result = subprocess.run(
+            ["jq", "-C", query, file],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout
+        else:
+            return f"jq error:\n{result.stderr}"
+    except subprocess.TimeoutExpired:
+        return "Query timed out"
+    except FileNotFoundError:
+        return "jq not found. Install with: brew install jq"
+
+
+@app.action("enter", silent=True)
+def copy_result(query: str):
+    """Copy the jq result to clipboard."""
+    file = app.arg("file")
+    if not file:
+        return
+
+    result = subprocess.run(
+        ["jq", query, file],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        subprocess.run(["pbcopy"], input=result.stdout, text=True)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1 and not os.environ.get("FZFUI_ARG_file"):
+        print(__doc__.strip())
+        sys.exit(1)
+    app()
