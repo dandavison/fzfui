@@ -17,6 +17,7 @@ class Action:
     reload: bool = False
     silent: bool = False
     field: int = 0
+    exit: bool = False
 
 
 class App:
@@ -152,10 +153,10 @@ class App:
         """Get a CLI argument value (set via FZFUI_ARG_<name> env var)."""
         return os.environ.get(f"FZFUI_ARG_{name}", default or "")
 
-    def action(self, key: str, *, reload: bool = False, silent: bool = False, field: int = 0):
+    def action(self, key: str, *, reload: bool = False, silent: bool = False, field: int = 0, exit: bool = False):
         def decorator(fn):
             self._actions[fn.__name__] = Action(
-                fn=fn, key=key, reload=reload, silent=silent, field=field
+                fn=fn, key=key, reload=reload, silent=silent, field=field, exit=exit
             )
             return fn
 
@@ -208,6 +209,8 @@ class App:
         for name, action in self._actions.items():
             execute = "execute-silent" if action.silent else "execute"
             binding = f"{execute}({script} _action {name} {{q}})"
+            if action.exit:
+                binding += "+abort"
             args.extend(["--bind", f"{action.key}:{binding}"])
 
         # Custom bindings (e.g., emacs keys)
@@ -267,6 +270,8 @@ class App:
                 binding = f"{execute}({script} _action {name} {field})"
                 if action.reload:
                     binding += f"+reload({script} _reload)"
+                if action.exit:
+                    binding += "+abort"
                 args.extend(["--bind", f"{action.key}:{binding}"])
 
             if self._preview_fn:

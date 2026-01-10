@@ -15,10 +15,10 @@ Type jq expressions in the query line and see results in real-time.
 Start with "." (identity) to see the full JSON.
 
 Keys:
-    enter     Copy result to clipboard (macOS)
+    enter     Print jq command and exit
     ctrl-k    Kill to end of line (emacs)
     ctrl-y    Yank (paste)
-    ctrl-c    Exit
+    ctrl-c    Exit without printing
 """
 
 from __future__ import annotations
@@ -79,20 +79,12 @@ def preview(query: str) -> str:
         return "jq not found. Install with: brew install jq"
 
 
-@app.action("enter", silent=True)
-def copy_result(query: str):
-    """Copy the jq result to clipboard."""
+@app.action("enter", exit=True)
+def accept(query: str):
+    """Print the jq command and exit."""
     file = app.arg("file")
-    if not file:
-        return
-
-    result = subprocess.run(
-        ["jq", query, file],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        subprocess.run(["pbcopy"], input=result.stdout, text=True)
+    if file:
+        print(f"jq '{query}' {file}")
 
 
 if __name__ == "__main__":
