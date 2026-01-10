@@ -15,10 +15,11 @@ Type jq expressions in the query line and see results in real-time.
 Start with "." (identity) to see the full JSON.
 
 Keys:
-    enter     Print jq command and exit
-    ctrl-k    Kill to end of line (emacs)
-    ctrl-y    Yank (paste)
-    ctrl-c    Exit without printing
+    enter       Print jq command and exit
+    alt-up/down Navigate history
+    ctrl-k      Kill to end of line (emacs)
+    ctrl-y      Yank (paste)
+    ctrl-c      Exit without printing
 """
 
 from __future__ import annotations
@@ -26,8 +27,11 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import fzfui
+
+HISTORY_FILE = Path.home() / ".jqi_history"
 
 # Handle file argument before fzfui takes over
 if len(sys.argv) >= 2 and not sys.argv[1].startswith("_"):
@@ -44,7 +48,10 @@ app = fzfui.App(__file__)
         "ctrl-k": "kill-line",
         "ctrl-p": "up",
         "ctrl-n": "down",
+        "alt-up": "prev-history",
+        "alt-down": "next-history",
     },
+    fzf_options=["--history", str(HISTORY_FILE)],
 )
 def jqi():
     pass
