@@ -16,6 +16,8 @@ Start with "." (identity) to see the full JSON.
 
 Keys:
     enter     Copy result to clipboard (macOS)
+    ctrl-k    Kill to end of line (emacs)
+    ctrl-y    Yank (paste)
     ctrl-c    Exit
 """
 
@@ -40,6 +42,11 @@ app = fzfui.App(__file__)
     disabled=True,
     initial_query=".",
     preview_window="up,90%,wrap",
+    bindings={
+        "ctrl-k": "kill-line",
+        "ctrl-p": "up",
+        "ctrl-n": "down",
+    },
 )
 def jqi():
     pass

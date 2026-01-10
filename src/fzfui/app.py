@@ -108,6 +108,7 @@ class App:
         disabled: bool = False,
         initial_query: str = "",
         preview_window: Optional[str] = None,
+        bindings: Optional[dict[str, str]] = None,
     ):
         """
         Decorator to configure the main fzf interface.
@@ -120,6 +121,7 @@ class App:
             disabled: If True, use preview mode (query is input, not filter)
             initial_query: Starting query string
             preview_window: Preview window config (e.g., "up,80%,wrap")
+            bindings: Extra fzf key bindings (e.g., {"ctrl-k": "kill-line"})
         """
         def decorator(fn):
             self._command = command
@@ -130,6 +132,7 @@ class App:
                 "disabled": disabled,
                 "initial_query": initial_query,
                 "preview_window": preview_window,
+                "bindings": bindings or {},
             }
             self._main_fn = fn
 
@@ -204,6 +207,10 @@ class App:
             binding = f"{execute}({script} _action {name} {{q}})"
             args.extend(["--bind", f"{action.key}:{binding}"])
 
+        # Custom bindings (e.g., emacs keys)
+        for key, fzf_action in self._config.get("bindings", {}).items():
+            args.extend(["--bind", f"{key}:{fzf_action}"])
+
         # Feed empty input - we don't need items in preview mode
         fzf_proc = subprocess.Popen(
             args,
@@ -267,6 +274,10 @@ class App:
                         "ctrl-h:toggle-preview",
                     ]
                 )
+
+            # Custom bindings
+            for key, fzf_action in self._config.get("bindings", {}).items():
+                args.extend(["--bind", f"{key}:{fzf_action}"])
 
             cmd_proc = subprocess.Popen(
                 self._command,
