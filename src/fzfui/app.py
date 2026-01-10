@@ -238,13 +238,10 @@ class App:
         # Raw fzf options
         args.extend(self._config.get("fzf_options", []))
 
-        # Feed empty input - we don't need items in preview mode
-        fzf_proc = subprocess.Popen(
-            args,
-            stdin=subprocess.PIPE,
-            env=os.environ,
-        )
-        fzf_proc.communicate(input=b"\n")
+        # Feed no input - we don't need items in preview mode
+        # Using `: |` pattern to send nothing (avoids vestigial selection UI)
+        fzf_cmd_str = " ".join(shlex.quote(arg) for arg in args)
+        subprocess.call(f": | {fzf_cmd_str}", shell=True, executable="/bin/bash")
 
     def _run_fzf_filter_mode(self):
         """Run fzf in filter mode (classic item selection)."""
