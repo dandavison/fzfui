@@ -207,6 +207,7 @@ class App:
             "reverse",
             "--border",
             "none",
+            "--input-border",
             "--prompt",
             "> ",
             "--no-info",
