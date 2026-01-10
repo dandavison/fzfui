@@ -9,34 +9,44 @@
 """
 jqi - Interactive jq expression explorer
 
-Usage: jqi <json-file>
+Usage: cat data.json | jqi
+       curl api.example.com | jqi '.items[]'
 
-Type jq expressions in the query line and see results in real-time.
+Type jq expressions and see results in real-time.
 Start with "." (identity) to see the full JSON.
 
 Keys:
-    enter       Print jq command and exit
+    enter       Output jq result and exit
     alt-up/down Navigate history
-    ctrl-k      Kill to end of line (emacs)
+    ctrl-k      Kill to end of line
     ctrl-y      Yank (paste)
-    ctrl-c      Exit without printing
+    esc/ctrl-c  Exit without output
 """
 
 from __future__ import annotations
 
+import atexit
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import fzfui
 
 HISTORY_FILE = Path.home() / ".jqi_history"
 
-# Handle file argument before fzfui takes over
-if len(sys.argv) >= 2 and not sys.argv[1].startswith("_"):
-    os.environ["FZFUI_ARG_file"] = sys.argv[1]
-    sys.argv = [sys.argv[0]]  # Remove arg so typer doesn't see it
+# Read stdin and save to temp file (jq needs to re-read on each query)
+# Do this before fzfui takes over, but only for main invocation
+if len(sys.argv) == 1 or (len(sys.argv) >= 2 and not sys.argv[1].startswith("_")):
+    if not sys.stdin.isatty():
+        fd, tmpfile = tempfile.mkstemp(prefix="jqi-", suffix=".json")
+        os.write(fd, sys.stdin.buffer.read())
+        os.close(fd)
+        os.environ["FZFUI_ARG_file"] = tmpfile
+        atexit.register(lambda: os.unlink(tmpfile))
+        # Reopen stdin from tty for fzf
+        sys.stdin = open("/dev/tty")
 
 app = fzfui.App(__file__)
 
@@ -61,7 +71,7 @@ def jqi():
 def preview(query: str) -> str:
     file = app.arg("file")
     if not file:
-        return "Usage: jqi <json-file>"
+        return "Pipe JSON to stdin: cat data.json | jqi"
 
     if not os.path.exists(file):
         return f"File not found: {file}"
@@ -84,15 +94,23 @@ def preview(query: str) -> str:
 
 
 @app.action("enter", exit=True)
-def accept(query: str):
-    """Print the jq command and exit."""
+def output_result(query: str):
+    """Output the jq result and exit."""
     file = app.arg("file")
-    if file:
-        print(f"jq '{query}' {file}")
+    if not file:
+        return
+
+    result = subprocess.run(
+        ["jq", query, file],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print(result.stdout, end="")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1 and not os.environ.get("FZFUI_ARG_file"):
-        print(__doc__.strip())
+    if sys.stdin.isatty() and not os.environ.get("FZFUI_ARG_file"):
+        print(__doc__.strip(), file=sys.stderr)
         sys.exit(1)
     app()
