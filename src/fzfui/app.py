@@ -193,18 +193,24 @@ class App:
         """Run fzf in preview/disabled mode (query is input, not filter)."""
         script = self.script
         initial_query = self._config.get("initial_query", "")
-        preview_window = self._config.get("preview_window", "up,80%,wrap")
+        preview_window = (
+            self._config.get("preview_window") or "up,99%,wrap,noinfo,border-none"
+        )
 
         args = [
             "fzf",
             "--ansi",
             "--disabled",
+            "--height",
+            "100%",
             "--layout",
             "reverse",
             "--border",
             "none",
             "--prompt",
             "> ",
+            "--no-info",
+            "--no-separator",
             "--with-shell",
             "bash -c",
         ]

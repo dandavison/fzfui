@@ -40,13 +40,11 @@ app = fzfui.App(__file__)
 @app.main(
     disabled=True,
     initial_query=".",
-    preview_window="up,99%,wrap,noinfo",
     bindings={
         "ctrl-k": "kill-line",
         "ctrl-p": "up",
         "ctrl-n": "down",
     },
-    fzf_options=["--height", "100%", "--pointer", "", "--no-info", "--no-separator"],
 )
 def jqi():
     pass
