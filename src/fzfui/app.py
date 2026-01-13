@@ -129,6 +129,7 @@ class App:
         preview_window: Optional[str] = None,
         bindings: Optional[dict[str, str]] = None,
         fzf_options: Optional[list[str]] = None,
+        prompt: str = "> ",
     ):
         """
         Decorator to configure the main fzf interface.
@@ -143,6 +144,7 @@ class App:
             preview_window: Preview window config (e.g., "up,80%,wrap")
             bindings: Extra fzf key bindings (e.g., {"ctrl-k": "kill-line"})
             fzf_options: Raw fzf CLI options (e.g., ["--height", "100%"])
+            prompt: Input prompt string (default: "> ")
         """
 
         def decorator(fn):
@@ -156,6 +158,7 @@ class App:
                 "preview_window": preview_window,
                 "bindings": bindings or {},
                 "fzf_options": fzf_options or [],
+                "prompt": prompt,
             }
             self._main_fn = fn
 
@@ -201,7 +204,6 @@ class App:
 
     def _run_fzf(self):
         disabled = self._config.get("disabled", False)
-
         if disabled:
             self._run_fzf_preview_mode()
         else:
@@ -236,7 +238,7 @@ class App:
                 "none",
                 "--input-border",
                 "--prompt",
-                "> ",
+                self._config.get("prompt", "> "),
                 "--no-info",
                 "--no-separator",
                 "--with-shell",
@@ -266,7 +268,8 @@ class App:
                 args.extend(["--bind", f"{action.key}:{binding}"])
 
             # Custom bindings (e.g., emacs keys)
-            for key, fzf_action in self._config.get("bindings", {}).items():
+            bindings = self._config.get("bindings", {})
+            for key, fzf_action in bindings.items():
                 args.extend(["--bind", f"{key}:{fzf_action}"])
 
             # Raw fzf options
@@ -275,6 +278,7 @@ class App:
             # Feed no input - we don't need items in preview mode
             # Using `: |` pattern to send nothing (avoids vestigial selection UI)
             fzf_cmd_str = " ".join(shlex.quote(arg) for arg in args)
+
             # Pass env with FZFUI_OUTPUT to child processes
             subprocess.call(
                 f": | FZFUI_OUTPUT={shlex.quote(output_file)} {fzf_cmd_str}",

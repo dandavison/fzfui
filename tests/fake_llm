@@ -1,0 +1,19 @@
+#!/bin/bash
+# Fake LLM for testing jqi
+# Echoes back a simple jq expression based on the prompt
+
+prompt="$1"
+
+# If prompt mentions "keys", return .[] | keys
+if [[ "$prompt" == *"keys"* ]]; then
+    echo '.[] | keys'
+# If prompt mentions "filter" or "where", return a select expression
+elif [[ "$prompt" == *"filter"* ]] || [[ "$prompt" == *"where"* ]]; then
+    echo '.[] | select(.value > 0)'
+# If prompt mentions "length" or "count", return length
+elif [[ "$prompt" == *"length"* ]] || [[ "$prompt" == *"count"* ]]; then
+    echo '. | length'
+# Default: just return identity
+else
+    echo '.'
+fi
