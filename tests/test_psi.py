@@ -284,11 +284,12 @@ class TestCommandMode:
                 tmux_cmd(socket, "send-keys", "-t", session_name, "C-u"),
                 check=True,
             )
+            time.sleep(0.3)
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, "ps -ef"),
                 check=True,
             )
-            time.sleep(1.0)
+            time.sleep(1.5)
 
             result = subprocess.run(
                 tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
@@ -409,9 +410,9 @@ class TestListeningProcesses:
             )
             output = result.stdout
 
-            # Footer should show "all processes" after ctrl-a
-            assert "all processes" in output, (
-                f"Expected 'all processes' in footer after ctrl-a, got:\n{output}"
+            # Footer should show ps command after ctrl-a
+            assert "ps -U" in output, (
+                f"Expected ps command in footer after ctrl-a, got:\n{output}"
             )
 
         finally:

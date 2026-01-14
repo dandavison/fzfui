@@ -15,7 +15,11 @@ import fzfui
 app = fzfui.App(__file__)
 
 
-# All processes with PORTS column (left join of ps + lsof)
+# The ps query - this is what we show in the footer
+PS_QUERY = "ps -U $USER -o pid,%cpu,%mem,stat,time,command"
+
+# Annotate ps output with listening ports (left join with lsof)
+# PID is field 1 (hidden via with_nth), PORTS is field 2
 PS_WITH_PORTS = r"""
 ps -U $USER -o pid,%cpu,%mem,stat,time,command | awk '
 BEGIN {
@@ -31,8 +35,16 @@ BEGIN {
     }
     close(cmd)
 }
-NR == 1 { printf "%-7s %-15s %s\n", $1, "PORTS", substr($0, index($0,$2)); next }
-{ printf "%-7s %-15s %s\n", $1, ($1 in ports) ? ports[$1] : "", substr($0, index($0,$2)) }
+NR == 1 {
+    printf "%7s %-12s %5s %5s %-4s %10s %s\n", $1, "PORTS", $2, $3, $4, $5, "COMMAND"
+    next
+}
+{
+    p = ($1 in ports) ? ports[$1] : ""
+    printf "%7s %-12s %5s %5s %-4s %10s ", $1, p, $2, $3, $4, $5
+    for(i=6;i<=NF;i++) printf "%s ", $i
+    print ""
+}
 ' | cut -c1-200
 """
 
@@ -44,9 +56,10 @@ LISTENING_ONLY = PS_WITH_PORTS.rstrip() + " | awk 'NR==1 || $2!=\"\"'"
     command=PS_WITH_PORTS,
     header_lines=1,
     with_nth="2..",
+    fzf_options=["--footer", PS_QUERY],  # Show clean ps command, not the awk script
     bindings={
-        "ctrl-l": f"reload({LISTENING_ONLY})+change-footer(listening only)",
-        "ctrl-a": f"reload({PS_WITH_PORTS})+change-footer(all processes)",
+        "ctrl-l": f"reload({LISTENING_ONLY})+change-footer({PS_QUERY} [listening])",
+        "ctrl-a": f"reload({PS_WITH_PORTS})+change-footer({PS_QUERY})",
     },
 )
 def psi():
