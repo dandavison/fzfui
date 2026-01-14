@@ -15,35 +15,38 @@ import fzfui
 app = fzfui.App(__file__)
 
 
-PS_CMD = "ps -U $USER -o pid,%cpu,%mem,stat,time,command | cut -c1-200"
-# Filter to processes with listening ports (macOS lsof), showing ports as a column
-LISTENING_CMD = r"""
-(printf "%-7s %-18s %5s %5s %-4s %-11s %s\n" "PID" "PORTS" "%CPU" "%MEM" "STAT" "TIME" "COMMAND"
-lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null | awk '
-NR>1 {
-    pid=$2; port=$9
-    sub(/.*:/, "", port); sub(/\(LISTEN\)/, "", port)
-    if (pid in ports) ports[pid]=ports[pid]","port
-    else ports[pid]=port
+# All processes with PORTS column (left join of ps + lsof)
+PS_WITH_PORTS = r"""
+ps -U $USER -o pid,%cpu,%mem,stat,time,command | awk '
+BEGIN {
+    cmd = "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null"
+    while ((cmd | getline line) > 0) {
+        n = split(line, arr)
+        if (n >= 9 && arr[1] != "COMMAND") {
+            pid = arr[2]; port = arr[9]
+            gsub(/.*:/, "", port); gsub(/\(LISTEN\)/, "", port)
+            if (pid in ports) ports[pid] = ports[pid] "," port
+            else ports[pid] = port
+        }
+    }
+    close(cmd)
 }
-END { for (pid in ports) print pid, ports[pid] }
-' | while read pid ports; do
-    ps -p "$pid" -o %cpu=,%mem=,stat=,time=,command= 2>/dev/null | head -1 | \
-    awk -v pid="$pid" -v ports="$ports" '{
-        printf "%-7s %-18s %5s %5s %-4s %-11s ", pid, ports, $1, $2, $3, $4
-        for(i=5;i<=NF;i++) printf "%s ", $i; print ""
-    }'
-done) | cut -c1-200
+NR == 1 { printf "%-7s %-15s %s\n", $1, "PORTS", substr($0, index($0,$2)); next }
+{ printf "%-7s %-15s %s\n", $1, ($1 in ports) ? ports[$1] : "", substr($0, index($0,$2)) }
+' | cut -c1-200
 """
+
+# Filter to only processes with listening ports
+LISTENING_ONLY = PS_WITH_PORTS.rstrip() + " | awk 'NR==1 || $2!=\"\"'"
 
 
 @app.main(
-    command=PS_CMD,
+    command=PS_WITH_PORTS,
     header_lines=1,
     with_nth="2..",
     bindings={
-        "ctrl-l": f"reload({LISTENING_CMD})+change-footer(listening processes)",
-        "ctrl-a": f"reload({PS_CMD})+change-footer({PS_CMD})",
+        "ctrl-l": f"reload({LISTENING_ONLY})+change-footer(listening only)",
+        "ctrl-a": f"reload({PS_WITH_PORTS})+change-footer(all processes)",
     },
 )
 def psi():
@@ -181,7 +184,7 @@ def help_panel(selection: str) -> str:
 
           enter       Show process details
           ctrl-k      Kill process (SIGKILL)
-          ctrl-l      Filter to listening processes
+          ctrl-l      Filter to listening processes only
           ctrl-a      Show all processes
           ctrl-r      Reload process list
           ctrl-h      Toggle this help
@@ -192,6 +195,7 @@ def help_panel(selection: str) -> str:
         │                         Columns                              │
         ╰──────────────────────────────────────────────────────────────╯
 
+          PORTS   TCP ports the process is listening on
           %CPU    CPU usage percentage
           %MEM    Memory usage percentage
           STAT    Process state (S=sleeping, R=running, etc.)

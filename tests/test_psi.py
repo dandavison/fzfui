@@ -55,7 +55,10 @@ class TestBasicUI:
     def test_psi_shows_footer_with_command(self):
         output = run_psi_test()
 
-        assert "ps " in output, f"Expected command in footer, got:\n{output}"
+        # Footer shows the command (awk script for ps+ports join)
+        assert "awk" in output or "ps" in output, (
+            f"Expected command in footer, got:\n{output}"
+        )
 
     def test_psi_shows_processes(self):
         output = run_psi_test()
@@ -68,7 +71,8 @@ class TestModeToggle:
     def test_starts_in_query_mode(self):
         output = run_psi_test()
 
-        assert "ps " in output, (
+        # Footer shows command (awk script for ps+ports join)
+        assert "awk" in output or "ps" in output, (
             f"Expected command in footer (query mode), got:\n{output}"
         )
 
@@ -119,7 +123,10 @@ class TestModeToggle:
                 f"Expected command mode prompt '>' after ctrl-\\, got:\n{output}"
             )
 
-            assert "ps " in output, f"Expected command visible, got:\n{output}"
+            # Command is visible in footer (truncated awk script shows "ports" and "cut")
+            assert "ports" in output or "cut" in output, (
+                f"Expected command visible in footer, got:\n{output}"
+            )
 
         finally:
             subprocess.run(
@@ -402,9 +409,9 @@ class TestListeningProcesses:
             )
             output = result.stdout
 
-            # Footer should show ps command again
-            assert "ps " in output, (
-                f"Expected 'ps' command in footer after ctrl-a, got:\n{output}"
+            # Footer should show "all processes" after ctrl-a
+            assert "all processes" in output, (
+                f"Expected 'all processes' in footer after ctrl-a, got:\n{output}"
             )
 
         finally:
