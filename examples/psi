@@ -153,36 +153,11 @@ def reload(_: str):
 
 @app.preview
 def help_panel(_: str) -> str:
-    # Extra bindings not registered as @app.action (raw fzf bindings)
     extra_bindings = {
         "ctrl-a": "Show all processes",
         "ctrl-l": "Filter to listening only",
     }
-
-    keybindings = app.help_text(extra_bindings=extra_bindings)
-
-    columns = dedent("""\
-
-  ╭─────────────────────────────────────────────────────────────╮
-  │                         Columns                             │
-  ╰─────────────────────────────────────────────────────────────╯
-
-    PORTS   TCP ports the process is listening on (- if none)
-    %CPU    CPU usage percentage
-    %MEM    Memory usage percentage
-    STAT    Process state (S=sleeping, R=running, etc.)
-    TIME    Cumulative CPU time
-    COMMAND Process command (truncated)
-
-    PID is hidden but used for kill/details.""")
-
-    return f"""  ╭─────────────────────────────────────────────────────────────╮
-  │                        Keybindings                          │
-  ╰─────────────────────────────────────────────────────────────╯
-
-{keybindings}
-{columns}
-"""
+    return app.help_text(extra_bindings=extra_bindings)
 
 
 if __name__ == "__main__":
