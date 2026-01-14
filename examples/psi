@@ -15,10 +15,36 @@ import fzfui
 app = fzfui.App(__file__)
 
 
+PS_CMD = "ps -U $USER -o pid,%cpu,%mem,stat,time,command | cut -c1-200"
+# Filter to processes with listening ports (macOS lsof), showing ports as a column
+LISTENING_CMD = r"""
+(printf "%-7s %-18s %5s %5s %-4s %-11s %s\n" "PID" "PORTS" "%CPU" "%MEM" "STAT" "TIME" "COMMAND"
+lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null | awk '
+NR>1 {
+    pid=$2; port=$9
+    sub(/.*:/, "", port); sub(/\(LISTEN\)/, "", port)
+    if (pid in ports) ports[pid]=ports[pid]","port
+    else ports[pid]=port
+}
+END { for (pid in ports) print pid, ports[pid] }
+' | while read pid ports; do
+    ps -p "$pid" -o %cpu=,%mem=,stat=,time=,command= 2>/dev/null | head -1 | \
+    awk -v pid="$pid" -v ports="$ports" '{
+        printf "%-7s %-18s %5s %5s %-4s %-11s ", pid, ports, $1, $2, $3, $4
+        for(i=5;i<=NF;i++) printf "%s ", $i; print ""
+    }'
+done) | cut -c1-200
+"""
+
+
 @app.main(
-    command="ps -U $USER -o pid,%cpu,%mem,stat,time,command | cut -c1-200",
+    command=PS_CMD,
     header_lines=1,
     with_nth="2..",
+    bindings={
+        "ctrl-l": f"reload({LISTENING_CMD})+change-footer(listening processes)",
+        "ctrl-a": f"reload({PS_CMD})+change-footer({PS_CMD})",
+    },
 )
 def psi():
     pass
@@ -107,15 +133,56 @@ def reload(_: str):
     pass
 
 
+def get_listening_ports(pid: str) -> str:
+    """Get listening ports for a given PID."""
+    result = subprocess.run(
+        ["lsof", "-iTCP", "-sTCP:LISTEN", "-P", "-n", "-p", pid],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return ""
+
+    ports = []
+    for line in result.stdout.strip().split("\n")[1:]:  # Skip header
+        parts = line.split()
+        if len(parts) >= 9:
+            # NAME field contains address:port
+            addr = parts[8]
+            if ":" in addr:
+                port = addr.rsplit(":", 1)[1]
+                if port not in ports:
+                    ports.append(port)
+    return ", ".join(ports) if ports else ""
+
+
 @app.preview
-def help_panel(_: str) -> str:
-    return dedent("""\
+def help_panel(selection: str) -> str:
+    # Extract PID from selection (first field)
+    pid = selection.split()[0] if selection else ""
+    ports_info = ""
+
+    if pid and pid.isdigit():
+        ports = get_listening_ports(pid)
+        if ports:
+            ports_info = f"""
+        ╭──────────────────────────────────────────────────────────────╮
+        │                    Listening Ports                           │
+        ╰──────────────────────────────────────────────────────────────╯
+
+          PID {pid} is listening on: {ports}
+
+"""
+
+    return ports_info + dedent("""\
         ╭──────────────────────────────────────────────────────────────╮
         │                        Keybindings                           │
         ╰──────────────────────────────────────────────────────────────╯
 
           enter       Show process details
           ctrl-k      Kill process (SIGKILL)
+          ctrl-l      Filter to listening processes
+          ctrl-a      Show all processes
           ctrl-r      Reload process list
           ctrl-h      Toggle this help
           ctrl-\\      Toggle query/command mode

@@ -306,6 +306,118 @@ class TestCommandMode:
             )
 
 
+class TestListeningProcesses:
+    def test_ctrl_l_filters_to_listening_processes(self):
+        session_name = f"test-psi-listening-{os.getpid()}"
+        socket = get_test_tmux_socket(session_name)
+        psi_path = EXAMPLES_DIR / "psi"
+
+        try:
+            subprocess.run(
+                tmux_cmd(
+                    socket,
+                    "new-session",
+                    "-d",
+                    "-s",
+                    session_name,
+                    "-c",
+                    str(EXAMPLES_DIR),
+                    str(psi_path),
+                ),
+                check=True,
+                timeout=5,
+            )
+            time.sleep(1.5)
+
+            subprocess.run(
+                tmux_cmd(socket, "send-keys", "-t", session_name, "C-l"),
+                check=True,
+            )
+            time.sleep(1.0)
+
+            result = subprocess.run(
+                tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            output = result.stdout
+
+            # Footer should show "listening processes"
+            assert "listening" in output.lower(), (
+                f"Expected 'listening' in footer after ctrl-l, got:\n{output}"
+            )
+
+        finally:
+            subprocess.run(
+                tmux_cmd(socket, "kill-session", "-t", session_name),
+                capture_output=True,
+                timeout=5,
+            )
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
+            )
+
+    def test_ctrl_a_returns_to_all_processes(self):
+        session_name = f"test-psi-all-{os.getpid()}"
+        socket = get_test_tmux_socket(session_name)
+        psi_path = EXAMPLES_DIR / "psi"
+
+        try:
+            subprocess.run(
+                tmux_cmd(
+                    socket,
+                    "new-session",
+                    "-d",
+                    "-s",
+                    session_name,
+                    "-c",
+                    str(EXAMPLES_DIR),
+                    str(psi_path),
+                ),
+                check=True,
+                timeout=5,
+            )
+            time.sleep(1.5)
+
+            # First filter to listening
+            subprocess.run(
+                tmux_cmd(socket, "send-keys", "-t", session_name, "C-l"),
+                check=True,
+            )
+            time.sleep(1.0)
+
+            # Then return to all
+            subprocess.run(
+                tmux_cmd(socket, "send-keys", "-t", session_name, "C-a"),
+                check=True,
+            )
+            time.sleep(1.0)
+
+            result = subprocess.run(
+                tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            output = result.stdout
+
+            # Footer should show ps command again
+            assert "ps " in output, (
+                f"Expected 'ps' command in footer after ctrl-a, got:\n{output}"
+            )
+
+        finally:
+            subprocess.run(
+                tmux_cmd(socket, "kill-session", "-t", session_name),
+                capture_output=True,
+                timeout=5,
+            )
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
+            )
+
+
 class TestScriptStructure:
     def test_psi_script_exists(self):
         psi_path = EXAMPLES_DIR / "psi"
@@ -336,3 +448,17 @@ class TestScriptStructure:
         psi_path = EXAMPLES_DIR / "psi"
         content = psi_path.read_text()
         assert "header_lines" in content, f"psi should configure header_lines"
+
+    def test_psi_has_listening_filter_bindings(self):
+        psi_path = EXAMPLES_DIR / "psi"
+        content = psi_path.read_text()
+        assert "ctrl-l" in content, f"psi should have ctrl-l binding for listening"
+        assert "ctrl-a" in content, f"psi should have ctrl-a binding for all processes"
+        assert "LISTEN" in content, f"psi should filter by LISTEN state"
+
+    def test_psi_has_get_listening_ports_function(self):
+        psi_path = EXAMPLES_DIR / "psi"
+        content = psi_path.read_text()
+        assert "get_listening_ports" in content, (
+            f"psi should have get_listening_ports function"
+        )
