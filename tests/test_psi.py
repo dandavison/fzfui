@@ -464,9 +464,9 @@ class TestScriptStructure:
         assert "ctrl-a" in content, f"psi should have ctrl-a binding for all processes"
         assert "LISTEN" in content, f"psi should filter by LISTEN state"
 
-    def test_psi_has_get_listening_ports_function(self):
+    def test_psi_uses_help_text(self):
         psi_path = EXAMPLES_DIR / "psi"
         content = psi_path.read_text()
-        assert "get_listening_ports" in content, (
-            f"psi should have get_listening_ports function"
+        assert "app.help_text" in content, (
+            f"psi should use app.help_text() for keybindings"
         )

@@ -151,47 +151,8 @@ def reload(_: str):
     pass
 
 
-def get_listening_ports(pid: str) -> str:
-    """Get listening ports for a given PID."""
-    result = subprocess.run(
-        ["lsof", "-iTCP", "-sTCP:LISTEN", "-P", "-n", "-p", pid],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0 or not result.stdout.strip():
-        return ""
-
-    ports = []
-    for line in result.stdout.strip().split("\n")[1:]:  # Skip header
-        parts = line.split()
-        if len(parts) >= 9:
-            # NAME field contains address:port
-            addr = parts[8]
-            if ":" in addr:
-                port = addr.rsplit(":", 1)[1]
-                if port not in ports:
-                    ports.append(port)
-    return ", ".join(ports) if ports else ""
-
-
 @app.preview
-def help_panel(selection: str) -> str:
-    # Extract PID from selection (first field)
-    pid = selection.split()[0] if selection else ""
-    ports_info = ""
-
-    if pid and pid.isdigit():
-        ports = get_listening_ports(pid)
-        if ports:
-            ports_info = f"""
-  ╭─────────────────────────────────────────────────────────────╮
-  │                    Listening Ports                          │
-  ╰─────────────────────────────────────────────────────────────╯
-
-    PID {pid} is listening on: {ports}
-
-"""
-
+def help_panel(_: str) -> str:
     # Extra bindings not registered as @app.action (raw fzf bindings)
     extra_bindings = {
         "ctrl-a": "Show all processes",
@@ -206,7 +167,7 @@ def help_panel(selection: str) -> str:
   │                         Columns                             │
   ╰─────────────────────────────────────────────────────────────╯
 
-    PORTS   TCP ports the process is listening on
+    PORTS   TCP ports the process is listening on (- if none)
     %CPU    CPU usage percentage
     %MEM    Memory usage percentage
     STAT    Process state (S=sleeping, R=running, etc.)
@@ -215,7 +176,7 @@ def help_panel(selection: str) -> str:
 
     PID is hidden but used for kill/details.""")
 
-    return f"""{ports_info}  ╭─────────────────────────────────────────────────────────────╮
+    return f"""  ╭─────────────────────────────────────────────────────────────╮
   │                        Keybindings                          │
   ╰─────────────────────────────────────────────────────────────╯
 
