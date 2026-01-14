@@ -217,16 +217,22 @@ class App:
     ) -> str:
         """Generate help text with all keybindings.
 
+        Automatically includes:
+        - Actions registered with @app.action (uses description or function name)
+        - Raw fzf bindings from @app.main(bindings=...) (uses extra_bindings for descriptions)
+        - Built-in bindings (ctrl-h, ctrl-\\, esc)
+
         Args:
-            extra_bindings: Additional keybindings to document (key -> description)
+            extra_bindings: Descriptions for raw fzf bindings (key -> description)
             extra_lines: Additional lines to include after keybindings
 
         Returns:
             Formatted help text string
         """
         lines = []
+        extra_bindings = extra_bindings or {}
 
-        # Collect all keybindings: user actions + extra + built-in
+        # Collect all keybindings: actions + raw bindings + built-in
         bindings: list[tuple[str, str]] = []
 
         # User-defined actions (sorted by key for consistency)
@@ -234,10 +240,12 @@ class App:
             desc = action.description or action.fn.__name__.replace("_", " ")
             bindings.append((action.key, desc))
 
-        # Extra bindings from caller (e.g., raw fzf bindings)
-        if extra_bindings:
-            for key, desc in extra_bindings.items():
-                bindings.append((key, desc))
+        # Raw fzf bindings from @app.main(bindings=...)
+        # Use extra_bindings for descriptions, or show key as placeholder
+        raw_bindings = self._config.get("bindings", {})
+        for key in sorted(raw_bindings.keys()):
+            desc = extra_bindings.get(key, f"({key})")
+            bindings.append((key, desc))
 
         # Built-in bindings (filter mode)
         disabled = self._config.get("disabled", False)
@@ -400,12 +408,21 @@ class App:
                 args.extend(["--bind", f"{action.key}:{binding}"])
 
             if self._preview_fn:
+                # Calculate preview height: actions + raw bindings + built-ins + padding
+                num_bindings = (
+                    len(self._actions)
+                    + len(self._config.get("bindings", {}))
+                    + 3  # ctrl-h, ctrl-\, esc
+                    + 2  # padding
+                )
+                preview_height = max(num_bindings, 8)  # minimum 8 lines
+
                 args.extend(
                     [
                         "--preview",
                         f"{script} _preview {field_spec}",
                         "--preview-window",
-                        "up,30%,hidden,wrap",
+                        f"up,{preview_height},hidden,wrap",
                         "--bind",
                         "ctrl-h:toggle-preview",
                     ]

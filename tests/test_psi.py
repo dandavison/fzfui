@@ -226,7 +226,7 @@ class TestQueryMode:
                 tmux_cmd(socket, "send-keys", "-t", session_name, "bash"),
                 check=True,
             )
-            time.sleep(0.5)
+            time.sleep(1.0)
 
             result = subprocess.run(
                 tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
