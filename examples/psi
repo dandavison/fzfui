@@ -66,7 +66,7 @@ def psi():
     pass
 
 
-@app.action("enter", field=1)
+@app.action("enter", description="Show process details", field=1)
 def detail(pid: str):
     pid = pid.strip()
     if not pid.isdigit():
@@ -134,7 +134,9 @@ def detail(pid: str):
     input("Press any key...")
 
 
-@app.action("ctrl-k", reload=True, silent=True, field=1)
+@app.action(
+    "ctrl-k", description="Kill process (SIGKILL)", reload=True, silent=True, field=1
+)
 def kill_proc(pid: str):
     pid = pid.strip()
     if pid.isdigit():
@@ -144,7 +146,7 @@ def kill_proc(pid: str):
             pass
 
 
-@app.action("ctrl-r", reload=True, silent=True)
+@app.action("ctrl-r", description="Reload process list", reload=True, silent=True)
 def reload(_: str):
     pass
 
@@ -182,41 +184,44 @@ def help_panel(selection: str) -> str:
         ports = get_listening_ports(pid)
         if ports:
             ports_info = f"""
-        ╭──────────────────────────────────────────────────────────────╮
-        │                    Listening Ports                           │
-        ╰──────────────────────────────────────────────────────────────╯
+  ╭─────────────────────────────────────────────────────────────╮
+  │                    Listening Ports                          │
+  ╰─────────────────────────────────────────────────────────────╯
 
-          PID {pid} is listening on: {ports}
+    PID {pid} is listening on: {ports}
 
 """
 
-    return ports_info + dedent("""\
-        ╭──────────────────────────────────────────────────────────────╮
-        │                        Keybindings                           │
-        ╰──────────────────────────────────────────────────────────────╯
+    # Extra bindings not registered as @app.action (raw fzf bindings)
+    extra_bindings = {
+        "ctrl-a": "Show all processes",
+        "ctrl-l": "Filter to listening only",
+    }
 
-          enter       Show process details
-          ctrl-k      Kill process (SIGKILL)
-          ctrl-l      Filter to listening processes only
-          ctrl-a      Show all processes
-          ctrl-r      Reload process list
-          ctrl-h      Toggle this help
-          ctrl-\\      Toggle query/command mode
-          esc         Exit
+    keybindings = app.help_text(extra_bindings=extra_bindings)
 
-        ╭──────────────────────────────────────────────────────────────╮
-        │                         Columns                              │
-        ╰──────────────────────────────────────────────────────────────╯
+    columns = dedent("""\
 
-          PORTS   TCP ports the process is listening on
-          %CPU    CPU usage percentage
-          %MEM    Memory usage percentage
-          STAT    Process state (S=sleeping, R=running, etc.)
-          TIME    Cumulative CPU time
-          COMMAND Process command (truncated)
+  ╭─────────────────────────────────────────────────────────────╮
+  │                         Columns                             │
+  ╰─────────────────────────────────────────────────────────────╯
 
-          PID is hidden but used for kill/details.
-        """)
+    PORTS   TCP ports the process is listening on
+    %CPU    CPU usage percentage
+    %MEM    Memory usage percentage
+    STAT    Process state (S=sleeping, R=running, etc.)
+    TIME    Cumulative CPU time
+    COMMAND Process command (truncated)
+
+    PID is hidden but used for kill/details.""")
+
+    return f"""{ports_info}  ╭─────────────────────────────────────────────────────────────╮
+  │                        Keybindings                          │
+  ╰─────────────────────────────────────────────────────────────╯
+
+{keybindings}
+{columns}
+"""
 
 
 if __name__ == "__main__":

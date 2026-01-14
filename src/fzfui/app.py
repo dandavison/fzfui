@@ -14,6 +14,7 @@ import typer
 class Action:
     fn: Callable
     key: str
+    description: str = ""
     reload: bool = False
     silent: bool = False
     field: int = 0
@@ -179,6 +180,7 @@ class App:
         self,
         key: str,
         *,
+        description: str = "",
         reload: bool = False,
         silent: bool = False,
         field: int = 0,
@@ -186,7 +188,13 @@ class App:
     ):
         def decorator(fn):
             self._actions[fn.__name__] = Action(
-                fn=fn, key=key, reload=reload, silent=silent, field=field, exit=exit
+                fn=fn,
+                key=key,
+                description=description,
+                reload=reload,
+                silent=silent,
+                field=field,
+                exit=exit,
             )
             return fn
 
@@ -201,6 +209,56 @@ class App:
         """Preview based on query string (for disabled/preview mode)."""
         self._query_preview_fn = fn
         return fn
+
+    def help_text(
+        self,
+        extra_bindings: Optional[dict[str, str]] = None,
+        extra_lines: Optional[list[str]] = None,
+    ) -> str:
+        """Generate help text with all keybindings.
+
+        Args:
+            extra_bindings: Additional keybindings to document (key -> description)
+            extra_lines: Additional lines to include after keybindings
+
+        Returns:
+            Formatted help text string
+        """
+        lines = []
+
+        # Collect all keybindings: user actions + extra + built-in
+        bindings: list[tuple[str, str]] = []
+
+        # User-defined actions (sorted by key for consistency)
+        for action in sorted(self._actions.values(), key=lambda a: a.key):
+            desc = action.description or action.fn.__name__.replace("_", " ")
+            bindings.append((action.key, desc))
+
+        # Extra bindings from caller (e.g., raw fzf bindings)
+        if extra_bindings:
+            for key, desc in extra_bindings.items():
+                bindings.append((key, desc))
+
+        # Built-in bindings (filter mode)
+        disabled = self._config.get("disabled", False)
+        if not disabled:
+            bindings.append(("ctrl-h", "Toggle help"))
+            bindings.append(("ctrl-\\", "Toggle query/command mode"))
+
+        bindings.append(("esc", "Exit"))
+
+        # Format bindings
+        if bindings:
+            max_key_len = max(len(k) for k, _ in bindings)
+            for key, desc in bindings:
+                lines.append(f"  {key:<{max_key_len}}  {desc}")
+
+        # Add extra lines if provided
+        if extra_lines:
+            lines.append("")
+            lines.extend(extra_lines)
+
+        return "\n".join(lines)
 
     def _run_fzf(self):
         disabled = self._config.get("disabled", False)
