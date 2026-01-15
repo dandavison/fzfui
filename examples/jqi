@@ -19,7 +19,7 @@ Keys:
     enter       Output jq result and exit
     ctrl-c      Print jq command (to stderr) and exit
     ctrl-\\      LLM assist - describe what you want in natural language
-    up/down     Navigate history
+    alt-up/down Navigate history
     ctrl-k      Kill to end of line
     ctrl-y      Yank (paste)
     esc         Exit without output
@@ -80,8 +80,8 @@ LLM_BINDING = f"transform({script} _llm-toggle {{q}})"
     prompt=PROMPT,
     bindings={
         "ctrl-k": "kill-line",
-        "up": "prev-history",
-        "down": "next-history",
+        "alt-up": "prev-history",
+        "alt-down": "next-history",
         "ctrl-\\": LLM_BINDING,  # LLM assist mode
         "enter": ENTER_BINDING,  # Override default enter
     },
