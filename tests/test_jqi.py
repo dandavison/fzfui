@@ -30,6 +30,88 @@ def tmux_cmd(socket: str, *args: str) -> list[str]:
     return ["tmux", "-L", socket] + list(args)
 
 
+class TestJqiOutput:
+    """Test that jqi outputs results to stdout for pipelines."""
+
+    def test_jqi_outputs_on_enter(self):
+        """Test that pressing enter outputs jq result to stdout."""
+        jqi_path = EXAMPLES_DIR / "jqi"
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"name": "test", "value": 42}, f)
+            json_file = f.name
+
+        session_name = f"test-jqi-output-{os.getpid()}"
+        socket = get_test_tmux_socket(session_name)
+
+        # Create a file to capture jqi's stdout
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".out", delete=False) as f:
+            output_file = f.name
+
+        try:
+            subprocess.run(
+                tmux_cmd(
+                    socket,
+                    "new-session",
+                    "-d",
+                    "-s",
+                    session_name,
+                    "-x",
+                    "120",
+                    "-y",
+                    "40",
+                ),
+                check=True,
+                timeout=5,
+            )
+
+            # Run jqi and redirect stdout to a file
+            subprocess.run(
+                tmux_cmd(
+                    socket,
+                    "send-keys",
+                    "-t",
+                    session_name,
+                    f"cat {json_file} | {jqi_path} > {output_file}",
+                    "Enter",
+                ),
+                check=True,
+            )
+            time.sleep(2.0)
+
+            # Press enter to output and exit
+            subprocess.run(
+                tmux_cmd(socket, "send-keys", "-t", session_name, "Enter"),
+                check=True,
+            )
+            time.sleep(1.5)
+
+            # Check the output file
+            with open(output_file) as f:
+                output = f.read()
+
+            print(f"jqi stdout output: {output!r}")
+
+            # Should contain the JSON (jq with "." outputs the input)
+            assert "name" in output or "test" in output or "value" in output, (
+                f"Expected JSON output, got: {output!r}"
+            )
+
+        finally:
+            subprocess.run(
+                tmux_cmd(socket, "kill-session", "-t", session_name),
+                capture_output=True,
+                timeout=5,
+            )
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"),
+                capture_output=True,
+                timeout=5,
+            )
+            os.unlink(json_file)
+            os.unlink(output_file)
+
+
 class TestJqiLlmBinding:
     """Test that the LLM assist binding works correctly."""
 

@@ -187,7 +187,7 @@ class App:
         exit: bool = False,
     ):
         def decorator(fn):
-            self._actions[fn.__name__] = Action(
+            self._actions[key] = Action(
                 fn=fn,
                 key=key,
                 description=description,
@@ -342,15 +342,13 @@ class App:
             args.extend(self._config.get("fzf_options", []))
 
             # Feed no input - we don't need items in preview mode
-            # Using `: |` pattern to send nothing (avoids vestigial selection UI)
-            fzf_cmd_str = " ".join(shlex.quote(arg) for arg in args)
-
-            # Pass env with FZFUI_OUTPUT to child processes
-            subprocess.call(
-                f": | FZFUI_OUTPUT={shlex.quote(output_file)} {fzf_cmd_str}",
-                shell=True,
-                executable="/bin/bash",
+            # Use empty stdin and pass env so child processes inherit FZFUI_OUTPUT
+            fzf_proc = subprocess.Popen(
+                args,
+                stdin=subprocess.DEVNULL,
+                env=env,
             )
+            fzf_proc.wait()
 
             # Print captured output from exit action (if any)
             with open(output_file) as f:
