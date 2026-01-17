@@ -104,7 +104,7 @@ def enter_handler(query: str = typer.Argument("")):
         if not llm_cmd:
             # No LLM configured - restore original
             # Use [] delimiters so parentheses in query are preserved
-            print(f"change-prompt({PROMPT})+change-query[{original}]")
+            print(f"change-prompt({PROMPT})+change-query[{original}]+refresh-preview")
             return
 
         json_file = app.arg("file")
@@ -122,7 +122,7 @@ def enter_handler(query: str = typer.Argument("")):
             new_expr = original  # Error - restore original
 
         # Use [] delimiters so parentheses in query are preserved
-        print(f"change-prompt({PROMPT})+change-query[{new_expr}]")
+        print(f"change-prompt({PROMPT})+change-query[{new_expr}]+refresh-preview")
     else:
         # Normal mode - output result and exit
         # Use execute+abort to run the action handler
