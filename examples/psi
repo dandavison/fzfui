@@ -18,7 +18,7 @@ app = fzfui.App(__file__)
 # The ps query - this is what we show in the footer
 PS_QUERY = "ps -U $USER -o pid,%cpu,%mem,stat,time,command"
 
-# Annotate ps output with listening ports (left join with lsof)
+# Annotate ps output with listening ports and cwd (left join with lsof)
 # PID is field 1 (hidden via with_nth), PORTS is field 2
 PS_WITH_PORTS = r"""
 ps -U $USER -o pid,%cpu,%mem,stat,time,command | awk '
@@ -34,18 +34,28 @@ BEGIN {
         }
     }
     close(cmd)
+    cmd = "lsof -d cwd -a -u $USER 2>/dev/null"
+    while ((cmd | getline line) > 0) {
+        n = split(line, arr)
+        if (n >= 9 && arr[1] != "COMMAND") {
+            pid = arr[2]; cwd[pid] = arr[n]
+        }
+    }
+    close(cmd)
 }
 NR == 1 {
-    printf "%7s %-12s %5s %5s %-4s %10s %s\n", $1, "PORTS", $2, $3, $4, $5, "COMMAND"
+    printf "%7s %-12s %5s %5s %-4s %10s %-20s %s\n", $1, "PORTS", $2, $3, $4, $5, "CWD", "COMMAND"
     next
 }
 {
     p = ($1 in ports) ? ports[$1] : "-"
-    printf "%7s %-12s %5s %5s %-4s %10s ", $1, p, $2, $3, $4, $5
+    c = ($1 in cwd) ? cwd[$1] : "-"
+    if (length(c) > 20) c = "..." substr(c, length(c)-16)
+    printf "%7s %-12s %5s %5s %-4s %10s %-20s ", $1, p, $2, $3, $4, $5, c
     for(i=6;i<=NF;i++) printf "%s ", $i
     print ""
 }
-' | cut -c1-200
+' | cut -c1-220
 """
 
 # Filter to only processes with listening ports (exclude "-" placeholder)

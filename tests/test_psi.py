@@ -123,8 +123,9 @@ class TestModeToggle:
                 f"Expected command mode prompt '>' after ctrl-\\, got:\n{output}"
             )
 
-            # Command is visible in footer (truncated awk script shows "ports" and "cut")
-            assert "ports" in output or "cut" in output, (
+            # Command is visible in footer (truncated awk script)
+            output_lower = output.lower()
+            assert "cwd" in output_lower or "ports" in output_lower or "cut" in output_lower, (
                 f"Expected command visible in footer, got:\n{output}"
             )
 
