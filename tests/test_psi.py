@@ -367,6 +367,65 @@ class TestListeningProcesses:
                 tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
             )
 
+    def test_filter_persists_after_reload(self):
+        session_name = f"test-psi-persist-{os.getpid()}"
+        socket = get_test_tmux_socket(session_name)
+        psi_path = EXAMPLES_DIR / "psi"
+
+        try:
+            subprocess.run(
+                tmux_cmd(
+                    socket,
+                    "new-session",
+                    "-d",
+                    "-s",
+                    session_name,
+                    "-c",
+                    str(EXAMPLES_DIR),
+                    str(psi_path),
+                ),
+                check=True,
+                timeout=5,
+            )
+            time.sleep(1.5)
+
+            # Switch to listening mode
+            subprocess.run(
+                tmux_cmd(socket, "send-keys", "-t", session_name, "C-l"),
+                check=True,
+            )
+            time.sleep(1.0)
+
+            # Trigger reload with ctrl-r
+            subprocess.run(
+                tmux_cmd(socket, "send-keys", "-t", session_name, "C-r"),
+                check=True,
+            )
+            time.sleep(1.0)
+
+            result = subprocess.run(
+                tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            output = result.stdout
+
+            # Footer should still show [listening] after reload
+            assert "[listening]" in output, (
+                f"Expected [listening] in footer after reload, got:\n{output}"
+            )
+
+        finally:
+            subprocess.run(
+                tmux_cmd(socket, "kill-session", "-t", session_name),
+                capture_output=True,
+                timeout=5,
+            )
+            subprocess.run(
+                tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
+            )
+
     def test_ctrl_l_toggles_back_to_all_processes(self):
         session_name = f"test-psi-all-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)

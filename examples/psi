@@ -6,24 +6,14 @@
 
 from __future__ import annotations
 
-import atexit
 import os
 import subprocess
-import sys
-from pathlib import Path
 from textwrap import dedent
 
 import fzfui
 
 app = fzfui.App(__file__)
 script = os.path.abspath(__file__)
-
-# State file to track listening filter - use parent PID for subprocess invocations
-_pid = os.environ.get("PSI_PID", str(os.getpid()))
-if "PSI_PID" not in os.environ:
-    os.environ["PSI_PID"] = _pid
-    atexit.register(lambda: Path(f"/tmp/psi-listening-{_pid}.state").unlink(missing_ok=True))
-LISTENING_STATE = Path(f"/tmp/psi-listening-{_pid}.state")
 
 
 # The ps query - this is what we show in the footer
@@ -76,6 +66,9 @@ NR == 1 {
 # Filter to only processes with listening ports (exclude "-" placeholder)
 LISTENING_ONLY = PS_WITH_PORTS.rstrip() + " | awk 'NR==1 || $2!=\"-\"'"
 
+# Register filters
+app.register_filter("all", PS_WITH_PORTS, footer=PS_QUERY, default=True)
+app.register_filter("listening", LISTENING_ONLY, footer=f"{PS_QUERY} [listening]")
 
 TOGGLE_LISTENING = f"transform({script} _toggle-listening)"
 
@@ -84,7 +77,7 @@ TOGGLE_LISTENING = f"transform({script} _toggle-listening)"
     command=PS_WITH_PORTS,
     header_lines=1,
     with_nth="2..",
-    fzf_options=["--footer", PS_QUERY],  # Show clean ps command, not the awk script
+    fzf_options=["--footer", PS_QUERY],
     bindings={"ctrl-l": TOGGLE_LISTENING},
 )
 def psi():
@@ -94,12 +87,7 @@ def psi():
 @app.cli.command("_toggle-listening", hidden=True)
 def toggle_listening():
     """Toggle between all processes and listening-only."""
-    if LISTENING_STATE.exists():
-        LISTENING_STATE.unlink()
-        print(f"reload({PS_WITH_PORTS})+change-footer({PS_QUERY})")
-    else:
-        LISTENING_STATE.touch()
-        print(f"reload({LISTENING_ONLY})+change-footer({PS_QUERY} [listening])")
+    print(app.toggle_filter("all", "listening"))
 
 
 @app.action("enter", description="Show process details", field=1)

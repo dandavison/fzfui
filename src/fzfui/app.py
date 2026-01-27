@@ -21,6 +21,13 @@ class Action:
     exit: bool = False
 
 
+@dataclass
+class Filter:
+    name: str
+    command: str
+    footer: str = ""
+
+
 class App:
     def __init__(self, script: str):
         self.script = os.path.abspath(script)
@@ -33,6 +40,8 @@ class App:
         self._query_preview_fn: Optional[Callable] = None
         self._reload_command: Optional[str] = None
         self._main_fn: Optional[Callable] = None
+        self._filters: dict[str, Filter] = {}
+        self._default_filter: Optional[str] = None
 
         self._register_internal_commands()
 
@@ -61,7 +70,9 @@ class App:
 
         @self.cli.command("_reload", hidden=True)
         def reload_cmd():
-            os.system(self._reload_command or self._command)
+            filt = self.current_filter
+            cmd = filt.command if filt else (self._reload_command or self._command)
+            os.system(cmd)
 
     def _handle_toggle(self):
         state_file = os.environ["FZFUI_STATE"]
@@ -175,6 +186,82 @@ class App:
     def arg(self, name: str, default: Optional[str] = None) -> str:
         """Get a CLI argument value (set via FZFUI_ARG_<name> env var)."""
         return os.environ.get(f"FZFUI_ARG_{name}", default or "")
+
+    def register_filter(
+        self, name: str, command: str, footer: str = "", *, default: bool = False
+    ) -> None:
+        """Register a named filter with its command and optional footer.
+
+        Args:
+            name: Unique identifier for this filter
+            command: Shell command to run when this filter is active
+            footer: Footer text to display (defaults to command if empty)
+            default: If True, set this as the initial filter
+        """
+        self._filters[name] = Filter(name=name, command=command, footer=footer or name)
+        if default:
+            self._default_filter = name
+
+    @property
+    def _filter_state_file(self) -> Optional[str]:
+        """Get the filter state file path from env var."""
+        return os.environ.get("FZFUI_FILTER_STATE")
+
+    def _set_filter_state(self, name: str) -> None:
+        """Write filter name to state file."""
+        state_file = self._filter_state_file
+        if state_file:
+            with open(state_file, "w") as f:
+                f.write(name)
+
+    @property
+    def current_filter(self) -> Optional[Filter]:
+        """Get the currently active filter, or None if no filter is set."""
+        state_file = self._filter_state_file
+        name = None
+        if state_file and os.path.exists(state_file):
+            with open(state_file) as f:
+                name = f.read().strip()
+        if not name and self._default_filter:
+            name = self._default_filter
+        return self._filters.get(name) if name else None
+
+    def set_filter(self, name: str) -> str:
+        """Set the current filter and return fzf actions to apply it.
+
+        Args:
+            name: Name of a registered filter
+
+        Returns:
+            fzf action string (reload + change-footer)
+        """
+        if name not in self._filters:
+            raise ValueError(f"Unknown filter: {name}")
+        filt = self._filters[name]
+        self._set_filter_state(name)
+        return f"reload({filt.command})+change-footer({filt.footer})"
+
+    def toggle_filter(self, *names: str) -> str:
+        """Toggle between filters and return fzf actions.
+
+        Cycles through the given filter names in order.
+
+        Args:
+            *names: Filter names to cycle through
+
+        Returns:
+            fzf action string for the next filter in the cycle
+        """
+        if not names:
+            raise ValueError("At least one filter name required")
+        current = self.current_filter
+        current_name = current.name if current else ""
+        if current_name in names:
+            idx = list(names).index(current_name)
+            next_name = names[(idx + 1) % len(names)]
+        else:
+            next_name = names[0]
+        return self.set_filter(next_name)
 
     def action(
         self,
@@ -365,9 +452,13 @@ class App:
         os.write(state_fd, f"query||{self._command}".encode())
         os.close(state_fd)
 
+        filter_fd, filter_state_file = tempfile.mkstemp(prefix="fzfui-filter-")
+        os.close(filter_fd)
+
         try:
             env = os.environ.copy()
             env["FZFUI_STATE"] = state_file
+            env["FZFUI_FILTER_STATE"] = filter_state_file
 
             script = self.script
             field_spec = "{}" if not self._config.get("with_nth") else "{1}"
@@ -449,6 +540,7 @@ class App:
 
         finally:
             os.unlink(state_file)
+            os.unlink(filter_state_file)
 
     def __call__(self):
         self.cli()
