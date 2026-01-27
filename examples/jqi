@@ -252,8 +252,9 @@ def output_result(query: str):
 
 @app.action("ctrl-c", exit=True)
 def print_command(query: str):
-    """Print the jq command and exit."""
+    """Print the jq command and copy expression to clipboard."""
     save_history(query)
+    subprocess.run(["pbcopy"], input=query, text=True)
     print(f"jq '{query}'", file=sys.stderr)
 
 
