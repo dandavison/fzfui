@@ -367,7 +367,7 @@ class TestListeningProcesses:
                 tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
             )
 
-    def test_ctrl_a_returns_to_all_processes(self):
+    def test_ctrl_l_toggles_back_to_all_processes(self):
         session_name = f"test-psi-all-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
         psi_path = EXAMPLES_DIR / "psi"
@@ -389,16 +389,16 @@ class TestListeningProcesses:
             )
             time.sleep(1.5)
 
-            # First filter to listening
+            # First toggle to listening
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, "C-l"),
                 check=True,
             )
             time.sleep(1.0)
 
-            # Then return to all
+            # Then toggle back to all (ctrl-l is a toggle)
             subprocess.run(
-                tmux_cmd(socket, "send-keys", "-t", session_name, "C-a"),
+                tmux_cmd(socket, "send-keys", "-t", session_name, "C-l"),
                 check=True,
             )
             time.sleep(1.0)
@@ -411,9 +411,13 @@ class TestListeningProcesses:
             )
             output = result.stdout
 
-            # Footer should show ps command after ctrl-a
+            # Footer should show ps command after toggling back
             assert "ps -U" in output, (
-                f"Expected ps command in footer after ctrl-a, got:\n{output}"
+                f"Expected ps command in footer after toggle, got:\n{output}"
+            )
+            # Should NOT show [listening] indicator
+            assert "[listening]" not in output, (
+                f"Should not show [listening] after toggling back:\n{output}"
             )
 
         finally:
@@ -462,7 +466,7 @@ class TestScriptStructure:
         psi_path = EXAMPLES_DIR / "psi"
         content = psi_path.read_text()
         assert "ctrl-l" in content, f"psi should have ctrl-l binding for listening"
-        assert "ctrl-a" in content, f"psi should have ctrl-a binding for all processes"
+        assert "toggle" in content.lower(), f"psi should have toggle functionality"
         assert "LISTEN" in content, f"psi should filter by LISTEN state"
 
     def test_psi_uses_help_text(self):
