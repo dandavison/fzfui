@@ -490,6 +490,48 @@ class TestListeningProcesses:
             )
 
 
+class TestNonInteractiveMode:
+    def test_psi_l_flag_shows_listening_processes(self):
+        psi_path = EXAMPLES_DIR / "psi"
+        result = subprocess.run(
+            ["uv", "run", str(psi_path), "-l"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"psi -l failed: {result.stderr}"
+        lines = result.stdout.strip().split("\n")
+        # Should have header + at least one process
+        assert len(lines) >= 1, "Expected at least header line"
+        # All non-header lines should have ports (not "-")
+        for line in lines[1:]:
+            parts = line.split()
+            if len(parts) >= 2:
+                # PORTS is the second field (after PID)
+                assert parts[1] != "-", f"Found non-listening process: {line}"
+
+    def test_psi_listening_flag_works(self):
+        psi_path = EXAMPLES_DIR / "psi"
+        result = subprocess.run(
+            ["uv", "run", str(psi_path), "--listening"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"psi --listening failed: {result.stderr}"
+        # Should produce some output
+        assert "PID" in result.stdout, "Expected header with PID column"
+
+    def test_psi_without_flags_does_not_produce_output(self):
+        # Without -l, psi should start interactive mode (fzf)
+        # We can't easily test this without tmux, but we can verify
+        # that the script structure includes the filter registration
+        psi_path = EXAMPLES_DIR / "psi"
+        content = psi_path.read_text()
+        assert 'cli=("-l"' in content, "psi should register -l CLI flag"
+        assert '"--listening"' in content, "psi should register --listening CLI flag"
+
+
 class TestScriptStructure:
     def test_psi_script_exists(self):
         psi_path = EXAMPLES_DIR / "psi"

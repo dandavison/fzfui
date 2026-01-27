@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shlex
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -26,6 +27,7 @@ class Filter:
     name: str
     command: str
     footer: str = ""
+    cli_flags: tuple[str, ...] = ()
 
 
 class App:
@@ -188,7 +190,13 @@ class App:
         return os.environ.get(f"FZFUI_ARG_{name}", default or "")
 
     def register_filter(
-        self, name: str, command: str, footer: str = "", *, default: bool = False
+        self,
+        name: str,
+        command: str,
+        footer: str = "",
+        *,
+        default: bool = False,
+        cli: str | tuple[str, ...] | None = None,
     ) -> None:
         """Register a named filter with its command and optional footer.
 
@@ -197,8 +205,14 @@ class App:
             command: Shell command to run when this filter is active
             footer: Footer text to display (defaults to command if empty)
             default: If True, set this as the initial filter
+            cli: CLI flag(s) for non-interactive mode (e.g., "-l" or ("-l", "--listening"))
         """
-        self._filters[name] = Filter(name=name, command=command, footer=footer or name)
+        cli_flags: tuple[str, ...] = ()
+        if cli:
+            cli_flags = (cli,) if isinstance(cli, str) else tuple(cli)
+        self._filters[name] = Filter(
+            name=name, command=command, footer=footer or name, cli_flags=cli_flags
+        )
         if default:
             self._default_filter = name
 
@@ -262,6 +276,17 @@ class App:
         else:
             next_name = names[0]
         return self.set_filter(next_name)
+
+    def run_filter(self, name: str) -> None:
+        """Run a filter's command directly and output results (non-interactive mode).
+
+        Args:
+            name: Name of a registered filter
+        """
+        if name not in self._filters:
+            raise ValueError(f"Unknown filter: {name}")
+        filt = self._filters[name]
+        subprocess.run(filt.command, shell=True)
 
     def action(
         self,
@@ -354,6 +379,18 @@ class App:
             lines.extend(extra_lines)
 
         return "\n".join(lines)
+
+    def _check_cli_filters(self) -> Optional[str]:
+        """Check if any CLI filter flags are in sys.argv.
+
+        Returns:
+            Filter name if a CLI flag matches, None otherwise.
+        """
+        for filt in self._filters.values():
+            for flag in filt.cli_flags:
+                if flag in sys.argv:
+                    return filt.name
+        return None
 
     def _run_fzf(self):
         disabled = self._config.get("disabled", False)
@@ -543,4 +580,9 @@ class App:
             os.unlink(filter_state_file)
 
     def __call__(self):
+        # Check for non-interactive CLI filter flags before typer parses args
+        cli_filter = self._check_cli_filters()
+        if cli_filter:
+            self.run_filter(cli_filter)
+            return
         self.cli()
