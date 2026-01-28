@@ -45,8 +45,9 @@ class TestBasicUI:
     def test_psi_starts_and_shows_output(self):
         output = run_psi_test()
 
-        assert "%CPU" in output or "cpu" in output.lower(), (
-            f"Expected %CPU column in output, got:\n{output}"
+        # Default view shows minimal columns: PORTS, CWD, COMMAND
+        assert "PORTS" in output or "ports" in output.lower(), (
+            f"Expected PORTS column in output, got:\n{output}"
         )
         assert "COMMAND" in output or "command" in output.lower(), (
             f"Expected COMMAND column in output, got:\n{output}"
@@ -530,6 +531,41 @@ class TestNonInteractiveMode:
         content = psi_path.read_text()
         assert 'cli=("-l"' in content, "psi should register -l CLI flag"
         assert '"--listening"' in content, "psi should register --listening CLI flag"
+
+    def test_psi_columns_flag_adds_columns(self):
+        psi_path = EXAMPLES_DIR / "psi"
+        result = subprocess.run(
+            ["uv", "run", str(psi_path), "-l", "--columns", "cpu,mem"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"psi -l --columns failed: {result.stderr}"
+        header = result.stdout.split("\n")[0]
+        assert "%CPU" in header, "Expected %CPU column in header"
+        assert "%MEM" in header, "Expected %MEM column in header"
+        # Should NOT have stat/time since not requested
+        assert "STAT" not in header, "Unexpected STAT column"
+        assert "TIME" not in header, "Unexpected TIME column"
+
+    def test_psi_minimal_columns_by_default(self):
+        psi_path = EXAMPLES_DIR / "psi"
+        result = subprocess.run(
+            ["uv", "run", str(psi_path), "-l"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"psi -l failed: {result.stderr}"
+        header = result.stdout.split("\n")[0]
+        # Minimal view should have PID, PORTS, CWD, COMMAND
+        assert "PID" in header, "Expected PID column"
+        assert "PORTS" in header, "Expected PORTS column"
+        assert "CWD" in header, "Expected CWD column"
+        assert "COMMAND" in header, "Expected COMMAND column"
+        # Should NOT have optional columns
+        assert "%CPU" not in header, "Unexpected %CPU column in minimal view"
+        assert "%MEM" not in header, "Unexpected %MEM column in minimal view"
 
 
 class TestScriptStructure:
