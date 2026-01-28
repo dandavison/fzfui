@@ -54,7 +54,9 @@ NR == 1 {
     p = ($1 in ports) ? ports[$1] : "-"
     if (length(p) > 12) p = substr(p, 1, 9) "..."
     c = ($1 in cwd) ? cwd[$1] : "-"
-    if (length(c) > 25) c = "..." substr(c, length(c)-21)
+    home = ENVIRON["HOME"]
+    if (home != "" && index(c, home) == 1) c = "~" substr(c, length(home) + 1)
+    if (length(c) > 50) c = substr(c, 1, 47) "..."
     cmd = ""
     for (i = 6; i <= NF; i++) cmd = cmd (i > 6 ? " " : "") $i
     if (length(cmd) > 80) cmd = substr(cmd, 1, 77) "..."
