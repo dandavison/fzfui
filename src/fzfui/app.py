@@ -53,8 +53,8 @@ class Filter:
 
 
 class App:
-    def __init__(self, script: str):
-        self.script = os.path.abspath(script)
+    def __init__(self, script: str | None = None):
+        self.script = os.path.abspath(script or sys.argv[0])
         self.cli = typer.Typer(add_completion=False, no_args_is_help=False)
 
         self._command: str = ""

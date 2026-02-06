@@ -25,6 +25,10 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 
+[project.scripts]
+jqi = "fzfui.tools.jqi:main"
+psi = "fzfui.tools.psi:main"
+
 [dependency-groups]
 dev = ["pytest>=9.0.2"]
 

@@ -1,9 +1,10 @@
-"""Tests for jqi example."""
+"""Tests for jqi tool."""
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import time
@@ -11,35 +12,15 @@ from pathlib import Path
 
 import pytest
 
-EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
-
 PROMPT = "jq> "
 LLM_PROMPT = "llm> "
 
 
-REPO_ROOT = EXAMPLES_DIR.parent
-
-
-@pytest.fixture(scope="module", autouse=True)
-def ensure_executable():
-    (EXAMPLES_DIR / "jqi").chmod(0o755)
-
-
-@pytest.fixture
-def jqi_script(tmp_path: Path) -> Path:
-    """Copy of jqi with local fzfui source for testing."""
-    dest = tmp_path / "jqi"
-    content = (
-        (EXAMPLES_DIR / "jqi")
-        .read_text()
-        .replace(
-            'fzfui = { git = "https://github.com/dandavison/fzfui.git" }',
-            f'fzfui = {{ path = "{REPO_ROOT}", editable = true }}',
-        )
-    )
-    dest.write_text(content)
-    dest.chmod(0o755)
-    return dest
+@pytest.fixture(scope="module")
+def jqi_path() -> str:
+    path = shutil.which("jqi")
+    assert path, "jqi not found on PATH; run tests via 'uv run pytest'"
+    return path
 
 
 def get_test_tmux_socket(session_name: str) -> str:
@@ -53,10 +34,8 @@ def tmux_cmd(socket: str, *args: str) -> list[str]:
 class TestJqiOutput:
     """Test that jqi outputs results to stdout for pipelines."""
 
-    def test_jqi_outputs_on_enter(self, jqi_script: Path):
+    def test_jqi_outputs_on_enter(self, jqi_path: str):
         """Test that pressing enter outputs jq result to stdout."""
-        jqi_path = jqi_script
-
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"name": "test", "value": 42}, f)
             json_file = f.name
@@ -64,7 +43,6 @@ class TestJqiOutput:
         session_name = f"test-jqi-output-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
 
-        # Create a file to capture jqi's stdout
         with tempfile.NamedTemporaryFile(mode="w", suffix=".out", delete=False) as f:
             output_file = f.name
 
@@ -85,7 +63,6 @@ class TestJqiOutput:
                 timeout=5,
             )
 
-            # Run jqi and redirect stdout to a file
             subprocess.run(
                 tmux_cmd(
                     socket,
@@ -99,20 +76,17 @@ class TestJqiOutput:
             )
             time.sleep(2.0)
 
-            # Press enter to output and exit
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, "Enter"),
                 check=True,
             )
             time.sleep(1.5)
 
-            # Check the output file
             with open(output_file) as f:
                 output = f.read()
 
             print(f"jqi stdout output: {output!r}")
 
-            # Should contain the JSON (jq with "." outputs the input)
             assert "name" in output or "test" in output or "value" in output, (
                 f"Expected JSON output, got: {output!r}"
             )
@@ -135,19 +109,16 @@ class TestJqiOutput:
 class TestJqiLlmBinding:
     """Test that the LLM assist binding works correctly."""
 
-    def test_llm_mode_toggle(self, jqi_script: Path):
+    def test_llm_mode_toggle(self, jqi_path: str):
         """Test that ctrl-k changes prompt to LLM mode."""
-        # Create a temp JSON file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"test": 123}, f)
             json_file = f.name
 
         session_name = f"test-jqi-llm-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        jqi_path = jqi_script
 
         try:
-            # Start jqi in tmux
             subprocess.run(
                 tmux_cmd(
                     socket,
@@ -177,7 +148,6 @@ class TestJqiLlmBinding:
             )
             time.sleep(2.0)
 
-            # Capture initial state - should show "jq> ." prompt
             result = subprocess.run(
                 tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
                 capture_output=True,
@@ -191,15 +161,13 @@ class TestJqiLlmBinding:
                 f"Expected '{PROMPT}.' prompt, got:\n{initial_output}"
             )
 
-            # Send LLM toggle key
-            llm_key = "C-\\"  # ctrl-backslash
+            llm_key = "C-\\"
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, llm_key),
                 check=True,
             )
             time.sleep(1.0)
 
-            # Capture output after LLM toggle
             result = subprocess.run(
                 tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
                 capture_output=True,
@@ -209,7 +177,6 @@ class TestJqiLlmBinding:
             after_toggle = result.stdout
             print(f"After LLM toggle:\n{after_toggle}")
 
-            # Should see LLM prompt (emoji prompt)
             assert f"{LLM_PROMPT}" in after_toggle, (
                 f"Expected LLM prompt after toggle, got:\n{after_toggle}"
             )
@@ -227,12 +194,10 @@ class TestJqiLlmBinding:
             )
             os.unlink(json_file)
 
-    def test_llm_toggle_command_works(self, jqi_script: Path):
+    def test_llm_toggle_command_works(self, jqi_path: str):
         """Test that the _llm-toggle command produces correct output."""
-        jqi_path = jqi_script
-
         result = subprocess.run(
-            [str(jqi_path), "_llm-toggle", ".foo"],
+            [jqi_path, "_llm-toggle", ".foo"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -241,15 +206,13 @@ class TestJqiLlmBinding:
         output = result.stdout + result.stderr
         print(f"_llm-toggle output: {output}")
 
-        # Should output fzf transform actions
         assert "change-prompt" in output or "llm-toggle" in output, (
             f"Expected transform actions from _llm-toggle, got:\n{output}"
         )
 
-    def test_llm_full_flow_with_fake_llm(self, jqi_script: Path):
+    def test_llm_full_flow_with_fake_llm(self, jqi_path: str):
         """Test full LLM flow: toggle -> type request -> enter -> get result."""
         fake_llm = Path(__file__).parent / "fake_llm"
-        jqi_path = jqi_script
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"items": [1, 2, 3]}, f)
@@ -257,7 +220,7 @@ class TestJqiLlmBinding:
 
         session_name = f"test-jqi-llm-full-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        llm_key = "C-\\"  # ctrl-backslash
+        llm_key = "C-\\"
 
         try:
             subprocess.run(
@@ -276,7 +239,6 @@ class TestJqiLlmBinding:
                 timeout=5,
             )
 
-            # Start jqi with fake LLM (export so fzf subprocesses inherit it)
             subprocess.run(
                 tmux_cmd(
                     socket,
@@ -290,7 +252,6 @@ class TestJqiLlmBinding:
             )
             time.sleep(2.0)
 
-            # Verify initial state
             result = subprocess.run(
                 tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
                 capture_output=True,
@@ -300,14 +261,12 @@ class TestJqiLlmBinding:
             print(f"Initial:\n{result.stdout}")
             assert PROMPT in result.stdout
 
-            # Enter LLM mode
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, llm_key),
                 check=True,
             )
             time.sleep(1.0)
 
-            # Verify LLM mode - prompt changes but preview stays the same
             result = subprocess.run(
                 tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
                 capture_output=True,
@@ -315,11 +274,9 @@ class TestJqiLlmBinding:
                 timeout=5,
             )
             print(f"After toggle:\n{result.stdout}")
-            assert LLM_PROMPT in result.stdout  # LLM mode prompt
-            # Preview should still show JSON data (not help text)
+            assert LLM_PROMPT in result.stdout
             assert "items" in result.stdout
 
-            # Type a request and press enter
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, "get length"),
                 check=True,
@@ -329,9 +286,8 @@ class TestJqiLlmBinding:
                 tmux_cmd(socket, "send-keys", "-t", session_name, "Enter"),
                 check=True,
             )
-            time.sleep(2.0)  # Give LLM time to run
+            time.sleep(2.0)
 
-            # After LLM call, should be back to normal mode with new expression
             result = subprocess.run(
                 tmux_cmd(socket, "capture-pane", "-t", session_name, "-p"),
                 capture_output=True,
@@ -340,8 +296,6 @@ class TestJqiLlmBinding:
             )
             print(f"After LLM:\n{result.stdout}")
 
-            # Should be back to normal prompt (jq>) after LLM call
-            # and have the expression from fake_llm (". | length" for "length")
             assert PROMPT in result.stdout, (
                 f"Should exit LLM mode, got:\n{result.stdout}"
             )

@@ -1,14 +1,27 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
 
 import pytest
 
-EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 TEST_INTERACTIVE = Path(__file__).parent / "test-interactive"
+PSI_MODULE = Path(__file__).parent.parent / "src" / "fzfui" / "tools" / "psi.py"
+
+
+@pytest.fixture(scope="module")
+def psi_path() -> str:
+    path = shutil.which("psi")
+    assert path, "psi not found on PATH; run tests via 'uv run pytest'"
+    return path
+
+
+@pytest.fixture(scope="module", autouse=True)
+def ensure_executable():
+    TEST_INTERACTIVE.chmod(0o755)
 
 
 def get_test_tmux_socket(session_name: str) -> str:
@@ -19,15 +32,14 @@ def tmux_cmd(socket: str, *args: str) -> list[str]:
     return ["tmux", "-L", socket] + list(args)
 
 
-def run_psi_test(args: str = "", sleep_time: float = 1.0) -> str:
+def run_psi_test(psi_path: str, args: str = "", sleep_time: float = 1.0) -> str:
     if os.environ.get("CI") == "true":
         sleep_time += 0.5
 
-    psi_path = EXAMPLES_DIR / "psi"
     command = f"{psi_path} {args}".strip()
 
     result = subprocess.run(
-        [TEST_INTERACTIVE, command, str(sleep_time)],
+        [str(TEST_INTERACTIVE), command, str(sleep_time)],
         capture_output=True,
         text=True,
         timeout=15,
@@ -35,17 +47,10 @@ def run_psi_test(args: str = "", sleep_time: float = 1.0) -> str:
     return result.stdout
 
 
-@pytest.fixture(scope="module", autouse=True)
-def ensure_executable():
-    TEST_INTERACTIVE.chmod(0o755)
-    (EXAMPLES_DIR / "psi").chmod(0o755)
-
-
 class TestBasicUI:
-    def test_psi_starts_and_shows_output(self):
-        output = run_psi_test()
+    def test_psi_starts_and_shows_output(self, psi_path: str):
+        output = run_psi_test(psi_path)
 
-        # Default view shows minimal columns: PORTS, CWD, COMMAND
         assert "PORTS" in output or "ports" in output.lower(), (
             f"Expected PORTS column in output, got:\n{output}"
         )
@@ -53,26 +58,24 @@ class TestBasicUI:
             f"Expected COMMAND column in output, got:\n{output}"
         )
 
-    def test_psi_shows_footer_with_command(self):
-        output = run_psi_test()
+    def test_psi_shows_footer_with_command(self, psi_path: str):
+        output = run_psi_test(psi_path)
 
-        # Footer shows the command (awk script for ps+ports join)
         assert "awk" in output or "ps" in output, (
             f"Expected command in footer, got:\n{output}"
         )
 
-    def test_psi_shows_processes(self):
-        output = run_psi_test()
+    def test_psi_shows_processes(self, psi_path: str):
+        output = run_psi_test(psi_path)
 
         lines = output.strip().split("\n")
         assert len(lines) > 3, f"Expected process data rows, got:\n{output}"
 
 
 class TestModeToggle:
-    def test_starts_in_query_mode(self):
-        output = run_psi_test()
+    def test_starts_in_query_mode(self, psi_path: str):
+        output = run_psi_test(psi_path)
 
-        # Footer shows command (awk script for ps+ports join)
         assert "awk" in output or "ps" in output, (
             f"Expected command in footer (query mode), got:\n{output}"
         )
@@ -82,10 +85,9 @@ class TestModeToggle:
             f"Expected prompt '/' in first few lines, got:\n{output}"
         )
 
-    def test_ctrl_backslash_switches_to_command_mode(self):
+    def test_ctrl_backslash_switches_to_command_mode(self, psi_path: str):
         session_name = f"test-psi-mode-toggle-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        psi_path = EXAMPLES_DIR / "psi"
 
         try:
             subprocess.run(
@@ -96,8 +98,8 @@ class TestModeToggle:
                     "-s",
                     session_name,
                     "-c",
-                    str(EXAMPLES_DIR),
-                    str(psi_path),
+                    "/tmp",
+                    psi_path,
                 ),
                 check=True,
                 timeout=5,
@@ -124,11 +126,12 @@ class TestModeToggle:
                 f"Expected command mode prompt '>' after ctrl-\\, got:\n{output}"
             )
 
-            # Command is visible in footer (truncated awk script)
             output_lower = output.lower()
-            assert "cwd" in output_lower or "ports" in output_lower or "cut" in output_lower, (
-                f"Expected command visible in footer, got:\n{output}"
-            )
+            assert (
+                "cwd" in output_lower
+                or "ports" in output_lower
+                or "cut" in output_lower
+            ), f"Expected command visible in footer, got:\n{output}"
 
         finally:
             subprocess.run(
@@ -140,10 +143,9 @@ class TestModeToggle:
                 tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
             )
 
-    def test_toggle_does_not_show_raw_action_string(self):
+    def test_toggle_does_not_show_raw_action_string(self, psi_path: str):
         session_name = f"test-psi-no-raw-action-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        psi_path = EXAMPLES_DIR / "psi"
 
         try:
             subprocess.run(
@@ -154,8 +156,8 @@ class TestModeToggle:
                     "-s",
                     session_name,
                     "-c",
-                    str(EXAMPLES_DIR),
-                    str(psi_path),
+                    "/tmp",
+                    psi_path,
                 ),
                 check=True,
                 timeout=5,
@@ -202,10 +204,9 @@ class TestModeToggle:
 
 
 class TestQueryMode:
-    def test_typing_filters_results(self):
+    def test_typing_filters_results(self, psi_path: str):
         session_name = f"test-psi-filter-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        psi_path = EXAMPLES_DIR / "psi"
 
         try:
             subprocess.run(
@@ -216,8 +217,8 @@ class TestQueryMode:
                     "-s",
                     session_name,
                     "-c",
-                    str(EXAMPLES_DIR),
-                    str(psi_path),
+                    "/tmp",
+                    psi_path,
                 ),
                 check=True,
                 timeout=5,
@@ -254,10 +255,9 @@ class TestQueryMode:
 
 
 class TestCommandMode:
-    def test_typing_in_command_mode_updates_results(self):
+    def test_typing_in_command_mode_updates_results(self, psi_path: str):
         session_name = f"test-psi-cmd-type-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        psi_path = EXAMPLES_DIR / "psi"
 
         try:
             subprocess.run(
@@ -268,8 +268,8 @@ class TestCommandMode:
                     "-s",
                     session_name,
                     "-c",
-                    str(EXAMPLES_DIR),
-                    str(psi_path),
+                    "/tmp",
+                    psi_path,
                 ),
                 check=True,
                 timeout=5,
@@ -317,10 +317,9 @@ class TestCommandMode:
 
 
 class TestListeningProcesses:
-    def test_ctrl_l_filters_to_listening_processes(self):
+    def test_ctrl_l_filters_to_listening_processes(self, psi_path: str):
         session_name = f"test-psi-listening-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        psi_path = EXAMPLES_DIR / "psi"
 
         try:
             subprocess.run(
@@ -331,8 +330,8 @@ class TestListeningProcesses:
                     "-s",
                     session_name,
                     "-c",
-                    str(EXAMPLES_DIR),
-                    str(psi_path),
+                    "/tmp",
+                    psi_path,
                 ),
                 check=True,
                 timeout=5,
@@ -353,7 +352,6 @@ class TestListeningProcesses:
             )
             output = result.stdout
 
-            # Footer should show "listening processes"
             assert "listening" in output.lower(), (
                 f"Expected 'listening' in footer after ctrl-l, got:\n{output}"
             )
@@ -368,10 +366,9 @@ class TestListeningProcesses:
                 tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
             )
 
-    def test_filter_persists_after_reload(self):
+    def test_filter_persists_after_reload(self, psi_path: str):
         session_name = f"test-psi-persist-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        psi_path = EXAMPLES_DIR / "psi"
 
         try:
             subprocess.run(
@@ -382,22 +379,20 @@ class TestListeningProcesses:
                     "-s",
                     session_name,
                     "-c",
-                    str(EXAMPLES_DIR),
-                    str(psi_path),
+                    "/tmp",
+                    psi_path,
                 ),
                 check=True,
                 timeout=5,
             )
             time.sleep(1.5)
 
-            # Switch to listening mode
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, "C-l"),
                 check=True,
             )
             time.sleep(1.0)
 
-            # Trigger reload with ctrl-r
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, "C-r"),
                 check=True,
@@ -412,7 +407,6 @@ class TestListeningProcesses:
             )
             output = result.stdout
 
-            # Footer should still show [listening] after reload
             assert "[listening]" in output, (
                 f"Expected [listening] in footer after reload, got:\n{output}"
             )
@@ -427,10 +421,9 @@ class TestListeningProcesses:
                 tmux_cmd(socket, "kill-server"), capture_output=True, timeout=5
             )
 
-    def test_ctrl_l_toggles_back_to_all_processes(self):
+    def test_ctrl_l_toggles_back_to_all_processes(self, psi_path: str):
         session_name = f"test-psi-all-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        psi_path = EXAMPLES_DIR / "psi"
 
         try:
             subprocess.run(
@@ -441,22 +434,20 @@ class TestListeningProcesses:
                     "-s",
                     session_name,
                     "-c",
-                    str(EXAMPLES_DIR),
-                    str(psi_path),
+                    "/tmp",
+                    psi_path,
                 ),
                 check=True,
                 timeout=5,
             )
             time.sleep(1.5)
 
-            # First toggle to listening
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, "C-l"),
                 check=True,
             )
             time.sleep(1.0)
 
-            # Then toggle back to all (ctrl-l is a toggle)
             subprocess.run(
                 tmux_cmd(socket, "send-keys", "-t", session_name, "C-l"),
                 check=True,
@@ -471,11 +462,9 @@ class TestListeningProcesses:
             )
             output = result.stdout
 
-            # Footer should show ps command after toggling back
             assert "ps -U" in output, (
                 f"Expected ps command in footer after toggle, got:\n{output}"
             )
-            # Should NOT show [listening] indicator
             assert "[listening]" not in output, (
                 f"Should not show [listening] after toggling back:\n{output}"
             )
@@ -492,50 +481,34 @@ class TestListeningProcesses:
 
 
 class TestNonInteractiveMode:
-    def test_psi_l_flag_shows_listening_processes(self):
-        psi_path = EXAMPLES_DIR / "psi"
+    def test_psi_l_flag_shows_listening_processes(self, psi_path: str):
         result = subprocess.run(
-            ["uv", "run", str(psi_path), "-l"],
+            [psi_path, "-l"],
             capture_output=True,
             text=True,
             timeout=10,
         )
         assert result.returncode == 0, f"psi -l failed: {result.stderr}"
         lines = result.stdout.strip().split("\n")
-        # Should have header + at least one process
         assert len(lines) >= 1, "Expected at least header line"
-        # All non-header lines should have ports (not "-")
         for line in lines[1:]:
             parts = line.split()
             if len(parts) >= 2:
-                # PORTS is the second field (after PID)
                 assert parts[1] != "-", f"Found non-listening process: {line}"
 
-    def test_psi_listening_flag_works(self):
-        psi_path = EXAMPLES_DIR / "psi"
+    def test_psi_listening_flag_works(self, psi_path: str):
         result = subprocess.run(
-            ["uv", "run", str(psi_path), "--listening"],
+            [psi_path, "--listening"],
             capture_output=True,
             text=True,
             timeout=10,
         )
         assert result.returncode == 0, f"psi --listening failed: {result.stderr}"
-        # Should produce some output
         assert "PID" in result.stdout, "Expected header with PID column"
 
-    def test_psi_without_flags_does_not_produce_output(self):
-        # Without -l, psi should start interactive mode (fzf)
-        # We can't easily test this without tmux, but we can verify
-        # that the script structure includes the filter registration
-        psi_path = EXAMPLES_DIR / "psi"
-        content = psi_path.read_text()
-        assert 'cli=("-l"' in content, "psi should register -l CLI flag"
-        assert '"--listening"' in content, "psi should register --listening CLI flag"
-
-    def test_psi_columns_flag_adds_columns(self):
-        psi_path = EXAMPLES_DIR / "psi"
+    def test_psi_columns_flag_adds_columns(self, psi_path: str):
         result = subprocess.run(
-            ["uv", "run", str(psi_path), "-l", "--columns", "cpu,mem"],
+            [psi_path, "-l", "--columns", "cpu,mem"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -544,71 +517,44 @@ class TestNonInteractiveMode:
         header = result.stdout.split("\n")[0]
         assert "%CPU" in header, "Expected %CPU column in header"
         assert "%MEM" in header, "Expected %MEM column in header"
-        # Should NOT have stat/time since not requested
         assert "STAT" not in header, "Unexpected STAT column"
         assert "TIME" not in header, "Unexpected TIME column"
 
-    def test_psi_minimal_columns_by_default(self):
-        psi_path = EXAMPLES_DIR / "psi"
+    def test_psi_minimal_columns_by_default(self, psi_path: str):
         result = subprocess.run(
-            ["uv", "run", str(psi_path), "-l"],
+            [psi_path, "-l"],
             capture_output=True,
             text=True,
             timeout=10,
         )
         assert result.returncode == 0, f"psi -l failed: {result.stderr}"
         header = result.stdout.split("\n")[0]
-        # Minimal view should have PID, PORTS, CWD, COMMAND
         assert "PID" in header, "Expected PID column"
         assert "PORTS" in header, "Expected PORTS column"
         assert "CWD" in header, "Expected CWD column"
         assert "COMMAND" in header, "Expected COMMAND column"
-        # Should NOT have optional columns
         assert "%CPU" not in header, "Unexpected %CPU column in minimal view"
         assert "%MEM" not in header, "Unexpected %MEM column in minimal view"
 
 
-class TestScriptStructure:
-    def test_psi_script_exists(self):
-        psi_path = EXAMPLES_DIR / "psi"
-        assert psi_path.exists(), f"psi script not found at {psi_path}"
-
-    def test_psi_has_uv_shebang(self):
-        psi_path = EXAMPLES_DIR / "psi"
-        with open(psi_path) as f:
-            first_line = f.readline()
-            assert "uv run" in first_line, (
-                f"psi should have uv run shebang, got: {first_line}"
-            )
-
-    def test_psi_has_script_dependencies(self):
-        psi_path = EXAMPLES_DIR / "psi"
-        content = psi_path.read_text()
-        assert "fzfui" in content, (
-            f"psi should depend on fzfui, got:\n{content[:500]}"
-        )
-
+class TestModuleStructure:
     def test_psi_has_kill_action(self):
-        psi_path = EXAMPLES_DIR / "psi"
-        content = psi_path.read_text()
-        assert "ctrl-k" in content, f"psi should have ctrl-k binding"
-        assert "kill" in content.lower(), f"psi should have kill functionality"
+        content = PSI_MODULE.read_text()
+        assert "ctrl-k" in content, "psi should have ctrl-k binding"
+        assert "kill" in content.lower(), "psi should have kill functionality"
 
     def test_psi_has_header_lines_config(self):
-        psi_path = EXAMPLES_DIR / "psi"
-        content = psi_path.read_text()
-        assert "header_lines" in content, f"psi should configure header_lines"
+        content = PSI_MODULE.read_text()
+        assert "header_lines" in content, "psi should configure header_lines"
 
     def test_psi_has_listening_filter_bindings(self):
-        psi_path = EXAMPLES_DIR / "psi"
-        content = psi_path.read_text()
-        assert "ctrl-l" in content, f"psi should have ctrl-l binding for listening"
-        assert "toggle" in content.lower(), f"psi should have toggle functionality"
-        assert "LISTEN" in content, f"psi should filter by LISTEN state"
+        content = PSI_MODULE.read_text()
+        assert "ctrl-l" in content, "psi should have ctrl-l binding for listening"
+        assert "toggle" in content.lower(), "psi should have toggle functionality"
+        assert "LISTEN" in content, "psi should filter by LISTEN state"
 
     def test_psi_uses_help_text(self):
-        psi_path = EXAMPLES_DIR / "psi"
-        content = psi_path.read_text()
+        content = PSI_MODULE.read_text()
         assert "app.help_text" in content, (
-            f"psi should use app.help_text() for keybindings"
+            "psi should use app.help_text() for keybindings"
         )
