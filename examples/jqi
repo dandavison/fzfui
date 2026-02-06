@@ -3,7 +3,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["fzfui", "typer"]
 # [tool.uv.sources]
-# fzfui = { path = "/Users/dan/src/fzfui", editable = true }
+# fzfui = { git = "https://github.com/dandavison/fzfui.git" }
 # ///
 
 """
