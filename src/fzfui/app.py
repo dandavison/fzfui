@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,27 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 import typer
+
+
+def copy_to_clipboard(text: str) -> None:
+    """Copy text to the system clipboard (macOS and Linux)."""
+    cmd = _clipboard_command()
+    subprocess.run(cmd, input=text, text=True, check=True)
+
+
+def _clipboard_command() -> list[str]:
+    if sys.platform == "darwin":
+        return ["pbcopy"]
+    if sys.platform == "linux":
+        for cmd in (
+            ["xclip", "-selection", "clipboard"],
+            ["xsel", "--clipboard", "--input"],
+            ["wl-copy"],
+        ):
+            if shutil.which(cmd[0]):
+                return cmd
+        raise RuntimeError("No clipboard tool found; install xclip, xsel, or wl-copy")
+    raise RuntimeError(f"Clipboard not supported on {sys.platform}")
 
 
 @dataclass

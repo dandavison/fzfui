@@ -227,7 +227,7 @@ def copy_result(query: str):
     # In preview mode, actions receive query, not selection
     file = app.arg("file")
     result = subprocess.run(["jq", query, file], capture_output=True, text=True)
-    subprocess.run(["pbcopy"], input=result.stdout, text=True)
+    fzfui.copy_to_clipboard(result.stdout)
 
 if __name__ == "__main__":
     app()

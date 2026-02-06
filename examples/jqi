@@ -254,7 +254,7 @@ def output_result(query: str):
 def print_command(query: str):
     """Print the jq command and copy expression to clipboard."""
     save_history(query)
-    subprocess.run(["pbcopy"], input=query, text=True)
+    fzfui.copy_to_clipboard(query)
     print(f"jq '{query}'", file=sys.stderr)
 
 
