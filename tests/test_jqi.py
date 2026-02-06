@@ -17,9 +17,29 @@ PROMPT = "jq> "
 LLM_PROMPT = "llm> "
 
 
+REPO_ROOT = EXAMPLES_DIR.parent
+
+
 @pytest.fixture(scope="module", autouse=True)
 def ensure_executable():
     (EXAMPLES_DIR / "jqi").chmod(0o755)
+
+
+@pytest.fixture
+def jqi_script(tmp_path: Path) -> Path:
+    """Copy of jqi with local fzfui source for testing."""
+    dest = tmp_path / "jqi"
+    content = (
+        (EXAMPLES_DIR / "jqi")
+        .read_text()
+        .replace(
+            'fzfui = { git = "https://github.com/dandavison/fzfui.git" }',
+            f'fzfui = {{ path = "{REPO_ROOT}", editable = true }}',
+        )
+    )
+    dest.write_text(content)
+    dest.chmod(0o755)
+    return dest
 
 
 def get_test_tmux_socket(session_name: str) -> str:
@@ -33,9 +53,9 @@ def tmux_cmd(socket: str, *args: str) -> list[str]:
 class TestJqiOutput:
     """Test that jqi outputs results to stdout for pipelines."""
 
-    def test_jqi_outputs_on_enter(self):
+    def test_jqi_outputs_on_enter(self, jqi_script: Path):
         """Test that pressing enter outputs jq result to stdout."""
-        jqi_path = EXAMPLES_DIR / "jqi"
+        jqi_path = jqi_script
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"name": "test", "value": 42}, f)
@@ -115,7 +135,7 @@ class TestJqiOutput:
 class TestJqiLlmBinding:
     """Test that the LLM assist binding works correctly."""
 
-    def test_llm_mode_toggle(self):
+    def test_llm_mode_toggle(self, jqi_script: Path):
         """Test that ctrl-k changes prompt to LLM mode."""
         # Create a temp JSON file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -124,7 +144,7 @@ class TestJqiLlmBinding:
 
         session_name = f"test-jqi-llm-{os.getpid()}"
         socket = get_test_tmux_socket(session_name)
-        jqi_path = EXAMPLES_DIR / "jqi"
+        jqi_path = jqi_script
 
         try:
             # Start jqi in tmux
@@ -207,9 +227,9 @@ class TestJqiLlmBinding:
             )
             os.unlink(json_file)
 
-    def test_llm_toggle_command_works(self):
+    def test_llm_toggle_command_works(self, jqi_script: Path):
         """Test that the _llm-toggle command produces correct output."""
-        jqi_path = EXAMPLES_DIR / "jqi"
+        jqi_path = jqi_script
 
         result = subprocess.run(
             [str(jqi_path), "_llm-toggle", ".foo"],
@@ -226,10 +246,10 @@ class TestJqiLlmBinding:
             f"Expected transform actions from _llm-toggle, got:\n{output}"
         )
 
-    def test_llm_full_flow_with_fake_llm(self):
+    def test_llm_full_flow_with_fake_llm(self, jqi_script: Path):
         """Test full LLM flow: toggle -> type request -> enter -> get result."""
         fake_llm = Path(__file__).parent / "fake_llm"
-        jqi_path = EXAMPLES_DIR / "jqi"
+        jqi_path = jqi_script
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"items": [1, 2, 3]}, f)
