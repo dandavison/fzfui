@@ -269,7 +269,7 @@ NR == 1 {{
 }}
 {{
     p = ($1 in ports) ? ports[$1] : "-"
-    if (length(p) > 12) p = substr(p, 1, 9) "..."
+    if (length(p) > 20) p = substr(p, 1, 17) "..."
     c = ($1 in cwd) ? cwd[$1] : "-"
     home = ENVIRON["HOME"]
     if (home != "" && index(c, home) == 1) c = "~" substr(c, length(home) + 1)
