@@ -14,6 +14,11 @@ ALL_COLUMNS = OPTIONAL_COLUMNS
 
 
 def main() -> None:
+    try:
+        os.environ.setdefault("COLUMNS", str(os.get_terminal_size().columns))
+    except OSError:
+        pass
+
     app = fzfui.App()
     script = app.script
 
@@ -217,32 +222,39 @@ def _strip_columns_arg() -> None:
 def _build_ps_command(columns: tuple[str, ...] = ()) -> str:
     """Build the ps command with optional columns."""
     cols = set(columns)
-    header_parts = ["$1", '"PORTS"']
-    data_parts = ["$1", "p"]
+    fixed_headers: list[str] = ["$1", '"PORTS"']
+    fixed_data: list[str] = ["$1", "p"]
 
     if "cpu" in cols:
-        header_parts.append("$2")
-        data_parts.append("$2")
+        fixed_headers.append("$2")
+        fixed_data.append("$2")
     if "mem" in cols:
-        header_parts.append("$3")
-        data_parts.append("$3")
+        fixed_headers.append("$3")
+        fixed_data.append("$3")
     if "stat" in cols:
-        header_parts.append("$4")
-        data_parts.append("$4")
+        fixed_headers.append("$4")
+        fixed_data.append("$4")
     if "time" in cols:
-        header_parts.append("$5")
-        data_parts.append("$5")
+        fixed_headers.append("$5")
+        fixed_data.append("$5")
 
-    header_parts.extend(['"CWD"', '"COMMAND"'])
-    data_parts.extend(["c", "cmd"])
+    fixed_headers.append('"CWD"')
+    fixed_data.append("c")
 
-    header_print = ", ".join(header_parts)
-    data_print = ", ".join(data_parts)
+    nc = len(fixed_headers)
+    fc = nc + 1
+
+    header_stores = "; ".join(f"f[0,{i}] = {h}" for i, h in enumerate(fixed_headers, 1))
+    header_stores += f'; f[0,{fc}] = "COMMAND"'
+
+    data_stores = "; ".join(f"f[nr,{i}] = {d}" for i, d in enumerate(fixed_data, 1))
+    data_stores += f"; f[nr,{fc}] = cmd"
 
     return rf"""
-ps -U $USER -o pid,%cpu,%mem,stat,time,command | awk '
+tw=${{FZF_COLUMNS:-${{COLUMNS:-$(tput cols 2>/dev/null || echo 120)}}}}
+ps -U $USER -o pid,%cpu,%mem,stat,time,command | awk -v tw="$tw" '
 BEGIN {{
-    OFS = "\t"
+    if (tw+0 < 40) tw = 120
     cmd = "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null"
     while ((cmd | getline line) > 0) {{
         n = split(line, arr)
@@ -264,22 +276,46 @@ BEGIN {{
     close(cmd)
 }}
 NR == 1 {{
-    print {header_print}
-    next
+    {header_stores}
+    for (i = 1; i <= {fc}; i++) if (length(f[0,i]) > w[i]) w[i] = length(f[0,i])
+    nr = 1; next
 }}
 {{
     p = ($1 in ports) ? ports[$1] : "-"
-    if (length(p) > 12) p = substr(p, 1, 9) "..."
     c = ($1 in cwd) ? cwd[$1] : "-"
     home = ENVIRON["HOME"]
     if (home != "" && index(c, home) == 1) c = "~" substr(c, length(home) + 1)
-    if (length(c) > 50) c = substr(c, 1, 47) "..."
     cmd = ""
     for (i = 6; i <= NF; i++) cmd = cmd (i > 6 ? " " : "") $i
-    if (length(cmd) > 80) cmd = substr(cmd, 1, 77) "..."
-    print {data_print}
+    {data_stores}
+    for (i = 1; i <= {fc}; i++) if (length(f[nr,i]) > w[i]) w[i] = length(f[nr,i])
+    nr++
 }}
-' | column -t -s $'\t'
+END {{
+    total = 0
+    for (i = 1; i <= {fc}; i++) total += w[i] + (i < {fc} ? 2 : 0)
+    if (total > tw) {{
+        pcap = int(tw / 4); if (pcap < 10) pcap = 10
+        if (w[2] > pcap) w[2] = pcap
+        ccap = int(tw / 3); if (ccap < 15) ccap = 15
+        if (w[{nc}] > ccap) w[{nc}] = ccap
+    }}
+    cw = tw
+    for (i = 1; i <= {nc}; i++) cw -= w[i] + 2
+    if (cw < 20) cw = 20
+    w[{fc}] = cw
+    for (r = 0; r < nr; r++) {{
+        s = ""
+        for (i = 1; i <= {fc}; i++) {{
+            v = f[r,i]
+            if (length(v) > w[i]) v = substr(v, 1, w[i] - 3) "..."
+            if (i < {fc}) s = s sprintf("%-" w[i] "s  ", v)
+            else s = s v
+        }}
+        print s
+    }}
+}}
+'
 """
 
 

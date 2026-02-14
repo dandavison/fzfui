@@ -537,6 +537,28 @@ class TestNonInteractiveMode:
         assert "%MEM" not in header, "Unexpected %MEM column in minimal view"
 
 
+class TestCommandColumnWidth:
+    def test_command_column_wider_with_more_columns(self, psi_path: str):
+        """Command column should use available terminal width, not a fixed cap."""
+        env = {**os.environ, "COLUMNS": "200"}
+        wide = subprocess.run(
+            [psi_path, "-l"], capture_output=True, text=True, timeout=10, env=env
+        )
+        env["COLUMNS"] = "80"
+        narrow = subprocess.run(
+            [psi_path, "-l"], capture_output=True, text=True, timeout=10, env=env
+        )
+        assert wide.returncode == 0
+        assert narrow.returncode == 0
+        wide_lines = wide.stdout.strip().split("\n")
+        narrow_lines = narrow.stdout.strip().split("\n")
+        if len(wide_lines) < 2 or len(narrow_lines) < 2:
+            pytest.skip("No data rows to compare")
+        assert max(len(line) for line in wide_lines) > max(
+            len(line) for line in narrow_lines
+        )
+
+
 class TestModuleStructure:
     def test_psi_has_kill_action(self):
         content = PSI_MODULE.read_text()
@@ -552,6 +574,15 @@ class TestModuleStructure:
         assert "ctrl-l" in content, "psi should have ctrl-l binding for listening"
         assert "toggle" in content.lower(), "psi should have toggle functionality"
         assert "LISTEN" in content, "psi should filter by LISTEN state"
+
+    def test_no_hardcoded_column_truncation(self):
+        content = PSI_MODULE.read_text()
+        assert "length(p) > 20" not in content, (
+            "Ports should not be hardcoded to 20 chars"
+        )
+        assert "length(c) > 50" not in content, (
+            "CWD should not be hardcoded to 50 chars"
+        )
 
     def test_psi_uses_help_text(self):
         content = PSI_MODULE.read_text()
