@@ -1,16 +1,17 @@
 # fzfui
 
-Build interactive fzf UIs with Python. Includes two tools: `jqi` (interactive jq explorer) and `psi` (interactive process viewer).
+Build interactive fzf UIs with Python. Includes three tools: `jqi` (interactive jq explorer), `psi` (interactive process viewer), and `vui` (fuzzy file browser).
 
 ## Prerequisites
 
 - [fzf](https://github.com/junegunn/fzf)
 - `jqi` also requires [jq](https://jqlang.github.io/jq/)
+- `vui` also requires [fd](https://github.com/sharkdp/fd), [bat](https://github.com/sharkdp/bat), and its enter action (default [nvim](https://neovim.io/); see `VUI_ACTION`)
 
 On macOS:
 
 ```bash
-brew install fzf jq
+brew install fzf jq fd bat neovim
 ```
 
 ## Install the tools
@@ -19,13 +20,14 @@ brew install fzf jq
 uv tool install git+https://github.com/dandavison/fzfui.git
 ```
 
-This installs `jqi` and `psi` as commands. If this is your first `uv tool install`, run `uv tool update-shell` to add the tool bin directory to your `PATH`.
+This installs `jqi`, `psi`, and `vui` as commands. If this is your first `uv tool install`, run `uv tool update-shell` to add the tool bin directory to your `PATH`.
 
 ### Try without installing
 
 ```bash
 uvx --from git+https://github.com/dandavison/fzfui.git jqi
 uvx --from git+https://github.com/dandavison/fzfui.git psi
+uvx --from git+https://github.com/dandavison/fzfui.git vui
 ```
 
 ### Upgrade
@@ -63,6 +65,28 @@ Keys:
 - **ctrl-o** - toggle extra columns (cpu, mem, stat, time)
 - **ctrl-r** - reload
 - **ctrl-\\** - toggle query/command mode
+
+## vui - Fuzzy File Browser
+
+Fuzzy-search files under a directory with a live `bat` preview.
+
+```bash
+vui             # browse the current directory
+vui ~/src       # browse a given directory
+```
+
+Keys:
+- **enter** - open the selected file (quit to return)
+- **ctrl-h** - toggle the preview pane
+- **ctrl-\\** - toggle query/command mode
+
+The enter action is chosen by the `VUI_ACTION` env var (default `nvim`):
+
+```bash
+VUI_ACTION=hx vui     # open in helix
+VUI_ACTION=micro vui  # open in micro
+VUI_ACTION=bat vui    # view in a bat pager (q to return)
+```
 
 ## Using fzfui as a library
 

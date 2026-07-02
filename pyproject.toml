@@ -28,6 +28,7 @@ classifiers = [
 [project.scripts]
 jqi = "fzfui.tools.jqi:main"
 psi = "fzfui.tools.psi:main"
+vui = "fzfui.tools.vui:main"
 
 [dependency-groups]
 dev = ["pytest>=9.0.2"]
