@@ -556,21 +556,23 @@ class App:
                 args.extend(["--bind", f"{action.key}:{binding}"])
 
             if self._preview_fn:
-                # Calculate preview height: actions + raw bindings + built-ins + padding
-                num_bindings = (
-                    len(self._actions)
-                    + len(self._config.get("bindings", {}))
-                    + 3  # ctrl-h, ctrl-\, esc
-                    + 2  # padding
-                )
-                preview_height = max(num_bindings, 8)  # minimum 8 lines
+                preview_window = self._config.get("preview_window")
+                if not preview_window:
+                    # Help-panel default: hidden, sized to the keybinding list
+                    num_bindings = (
+                        len(self._actions)
+                        + len(self._config.get("bindings", {}))
+                        + 3  # ctrl-h, ctrl-\, esc
+                        + 2  # padding
+                    )
+                    preview_window = f"up,{max(num_bindings, 8)},hidden,wrap"
 
                 args.extend(
                     [
                         "--preview",
                         f"{script} _preview {field_spec}",
                         "--preview-window",
-                        f"up,{preview_height},hidden,wrap",
+                        preview_window,
                         "--bind",
                         "ctrl-h:toggle-preview",
                     ]
